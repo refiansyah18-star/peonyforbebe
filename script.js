@@ -1635,12 +1635,9 @@
           (isFirstBloom ? 1.24 : isHero ? 1.12 : 0.84 + rng() * 0.34);
 
         // Choreographed Timeline:
-        // 1) Plant 0 (Spotlight First Flower): grows & blooms cleanly inside the FIRST 8 SECONDS!
-        //    - 0.0s-1.4s: Golden light streams to center soil
-        //    - 0.6s-3.5s: First stem & leaves rise gracefully
-        //    - 2.8s-4.4s: Silky peony bud forms
-        //    - 3.8s-8.0s: Petals unfurl petal-by-petal to the beat -> radiant full bloom right at 8.0s!
-        // 2) Plants 1..N (The Whole Garden): awaken right after and sweep outward from center to edges!
+        // - ALL stems & leaves across the whole garden grow together right from the start!
+        // - First hero flower (i === 0) finishes blooming RIGHT at 8.0s on the song beat!
+        // - All remaining flowers follow blooming gracefully in waves across the whole garden.
         let stemStart;
         let stemDuration;
         let budStart;
@@ -1649,31 +1646,36 @@
         let bloomDuration;
 
         if (isFirstBloom) {
-          stemStart = secToNorm(firstFinishSec * 0.075); // ~0.6s
-          stemDuration = secToNorm(firstFinishSec * 0.36); // ~0.6s -> 3.5s
-          budStart = secToNorm(firstFinishSec * 0.34); // ~2.7s
-          budDuration = secToNorm(firstFinishSec * 0.2); // ~2.7s -> 4.3s
-          bloomStart = secToNorm(firstFinishSec * 0.475); // ~3.8s
-          bloomDuration = secToNorm(firstFinishSec * 0.525); // ~3.8s -> 8.0s EXACT!
+          stemStart = secToNorm(firstFinishSec * 0.1); // ~0.8s
+          stemDuration = secToNorm(firstFinishSec * 0.4); // ~0.8s -> 4.0s
+          budStart = secToNorm(firstFinishSec * 0.4); // ~3.2s
+          budDuration = secToNorm(firstFinishSec * 0.2); // ~3.2s -> 4.8s
+          bloomStart = secToNorm(firstFinishSec * 0.575); // ~4.6s
+          bloomDuration = secToNorm(firstFinishSec * 0.425); // ~4.6s -> 8.0s EXACT!
         } else {
-          const restStart = secToNorm(firstFinishSec * 0.94); // ~7.5s, wakes up as flower #1 peaks!
           const centerDist = Math.abs(xNorm - 0.5) * 2; // 0 at center, 1 at far left/right
-          const wave = isHero
-            ? (i - 1) * 0.028
-            : 0.02 + centerDist * 0.16 + rng() * 0.15;
 
-          stemStart = clamp(restStart + wave * 0.65, restStart, 0.44);
-          stemDuration = 0.12 + rng() * 0.06;
+          // All other stems grow up together right from the start (no lonely single stem!)
+          const stemStartSec = 1.0 + centerDist * 2.3 + rng() * 2.5; // ~1.0s -> 5.8s
+          const stemDurSec = 4.2 + rng() * 2.4; // ~4.2s -> 6.6s
+          stemStart = clamp(secToNorm(stemStartSec), 0.02, 0.22);
+          stemDuration = clamp(secToNorm(stemDurSec), 0.09, 0.19);
 
-          budStart = clamp(stemStart + stemDuration * 0.72, restStart + 0.08, 0.56);
-          budDuration = 0.07 + rng() * 0.035;
+          budStart = clamp(stemStart + stemDuration * 0.72, 0.09, 0.34);
+          budDuration = clamp(secToNorm(2.6 + rng() * 1.4), 0.055, 0.11);
 
-          bloomStart = clamp(
-            restStart + 0.13 + centerDist * 0.15 + rng() * 0.22,
-            restStart + 0.11,
-            0.73
-          );
-          bloomDuration = clamp(0.14 + rng() * 0.07, 0.12, 0.91 - bloomStart);
+          // Remaining flowers start blooming right after the first flower blooms at 8.0s!
+          const afterFirst = secToNorm(firstFinishSec + 0.4); // ~8.4s
+          if (isHero) {
+            bloomStart = clamp(afterFirst + (i - 1) * secToNorm(1.65), afterFirst, 0.55);
+          } else {
+            bloomStart = clamp(
+              afterFirst + secToNorm(0.8 + centerDist * 7.8 + rng() * 11.5),
+              afterFirst,
+              0.72
+            );
+          }
+          bloomDuration = clamp(secToNorm(5.8 + rng() * 3.0), 0.12, 0.91 - bloomStart);
         }
 
         // Compound leaves along each stem (2 to 4 alternating leaf clusters)
@@ -1691,8 +1693,8 @@
             side,
             size: radius * (0.58 + rng() * 0.32),
             angleJitter: (rng() - 0.5) * 0.24,
-            leafStart: clamp(stemStart + stemDuration * t * 0.88, 0.02, 0.58),
-            leafDuration: isFirstBloom ? secToNorm(1.4) : 0.08 + rng() * 0.04,
+            leafStart: clamp(stemStart + stemDuration * t * 0.88, 0.02, 0.4),
+            leafDuration: isFirstBloom ? secToNorm(1.5) : 0.08 + rng() * 0.04,
           });
         }
 
@@ -1717,7 +1719,7 @@
           const attachT = 0.44 + rng() * 0.2;
           const bLen = stemHeight * (0.24 + rng() * 0.14);
           const bRadius = radius * (0.54 + rng() * 0.22);
-          const bStart = clamp(stemStart + stemDuration * 0.65, 0.24, 0.56);
+          const bStart = clamp(stemStart + stemDuration * 0.65, 0.1, 0.36);
           const bDur = 0.1 + rng() * 0.04;
           const isStayingHalfBud = rng() < 0.22; // Keep a few tender half-open buds for botanical realism!
 
@@ -1731,11 +1733,11 @@
               radius: bRadius,
               palette,
               depth: clamp(depth - 0.08, 0.05, 0.94),
-              budStart: clamp(bStart + bDur * 0.75, 0.34, 0.66),
+              budStart: clamp(bStart + bDur * 0.75, 0.2, 0.48),
               budDuration: 0.075,
               bloomStart: isStayingHalfBud
                 ? 0.8
-                : clamp(bloomStart + 0.05 + rng() * 0.07, 0.44, 0.78),
+                : clamp(bloomStart + 0.05 + rng() * 0.07, 0.28, 0.78),
               bloomDuration: isStayingHalfBud ? 0.42 : 0.13,
               facingTilt: 0.72 + rng() * 0.22,
               tiltAngle: side * (0.2 + rng() * 0.35),
@@ -1775,36 +1777,29 @@
       this.plants = plants;
     }
 
-    // Build luminous light-particle streams:
-    // Wave 1 (0s-1.5s) streams straight to center to awaken the FIRST spotlight flower!
-    // Wave 2 (~6.5s-18s) sweeps across the whole garden right as flower #1 finishes blooming.
+    // Build luminous light-particle streams across the entire width right at the start
+    // to awaken all stems together across the garden!
     buildGatheringLights() {
       const rng = createRng(99371);
       this.gatheringLights = [];
 
       for (const plant of this.plants) {
-        const isFirst = plant.id === 0;
-        const count = isFirst ? 14 : this.quality.gatheringPerPlant;
-        for (let k = 0; k < count; k++) {
-          const startX = plant.rootX + (rng() - 0.5) * this.width * (isFirst ? 0.28 : 0.34);
+        for (let k = 0; k < this.quality.gatheringPerPlant; k++) {
+          const startX = plant.rootX + (rng() - 0.5) * this.width * 0.34;
           const startY = this.height * (0.08 + rng() * 0.54);
-          const arriveTime = isFirst
-            ? clamp(plant.stemStart + rng() * 0.025, 0.015, 0.055)
-            : clamp(plant.stemStart + (rng() - 0.5) * 0.03, 0.16, 0.46);
-          const departTime = isFirst
-            ? clamp(rng() * 0.015, 0, arriveTime - 0.01)
-            : clamp(arriveTime - (0.05 + rng() * 0.05), 0.11, arriveTime - 0.02);
+          const arriveTime = clamp(plant.stemStart + (rng() - 0.5) * 0.03, 0.02, 0.24);
+          const departTime = clamp(arriveTime - (0.04 + rng() * 0.05), 0.0, Math.max(0.01, arriveTime - 0.015));
 
           this.gatheringLights.push({
             startX,
             startY,
-            targetX: plant.rootX + (rng() - 0.5) * (isFirst ? 10 : 18),
+            targetX: plant.rootX + (rng() - 0.5) * 18,
             targetY: this.height - 6 - rng() * 18,
-            swirlAmp: (rng() - 0.5) * (isFirst ? 75 : 90),
+            swirlAmp: (rng() - 0.5) * 90,
             departTime,
             arriveTime,
-            size: isFirst ? 7 + rng() * 10 : 5 + rng() * 9,
-            color: rng() < 0.52 ? "gold" : plant.sparkColor,
+            size: 5 + rng() * 9,
+            color: rng() < 0.48 ? "gold" : plant.sparkColor,
           });
         }
       }
@@ -2030,7 +2025,7 @@
 
     // Stage 2: Magical light particles streaming & gathering into the dark soil to awaken seeds
     drawGatheringLights(ctx, normTime) {
-      if (this.mode === "landing" || normTime > 0.52) return;
+      if (this.mode === "landing" || normTime > 0.3) return;
 
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
