@@ -280,7 +280,7 @@
         try {
           this.setupAnalyser();
           if (this.audioCtx && this.audioCtx.state === "suspended") {
-            this.audioCtx.resume().catch(() => {});
+            this.audioCtx.resume().catch(() => { });
           }
           await this.audioEl.play();
           this.fadeAudioTo(CONFIG.musicVolume, 1600);
