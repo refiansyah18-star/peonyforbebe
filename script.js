@@ -1336,6 +1336,7 @@
       this.plants = [];
       this.gatheringLights = [];
       this.fireflies = [];
+      this.butterflies = [];
       this.sparkles = [];
       this.driftingPetals = [];
 
@@ -1361,6 +1362,7 @@
           tierScale: isNarrow ? 0.78 : 0.9,
           starCount: isNarrow ? 95 : 130,
           fireflyCount: isNarrow ? 44 : 64,
+          butterflyCount: isNarrow ? 5 : 7,
           gatheringPerPlant: isNarrow ? 4 : 5,
           maxDriftingPetals: isNarrow ? 14 : 22,
           initialZoom: isNarrow ? 1.18 : 1.24,
@@ -1372,6 +1374,7 @@
           tierScale: 0.95,
           starCount: 145,
           fireflyCount: 72,
+          butterflyCount: 7,
           gatheringPerPlant: 5,
           maxDriftingPetals: 24,
           initialZoom: 1.25,
@@ -1383,6 +1386,7 @@
           tierScale: 1.05,
           starCount: 185,
           fireflyCount: 92,
+          butterflyCount: 9,
           gatheringPerPlant: 6,
           maxDriftingPetals: 30,
           initialZoom: 1.28,
@@ -1405,6 +1409,7 @@
       this.buildStars();
       this.buildGardenPlants();
       this.buildFireflies();
+      this.buildButterflies();
 
       const normTime =
         this.mode === "landing"
@@ -1560,15 +1565,10 @@
       const plants = [];
       const heroCount = Math.min(7, Math.round(count * 0.16));
       const nonHeroCount = Math.max(1, count - heroCount);
-      const D = CONFIG.durationSec;
-      const firstFinishSec = Math.min(CONFIG.firstBloomSec, D * 0.42);
-      const secToNorm = (sec) => clamp(sec / D, 0, 1);
 
-      // Create 3 lush depth bands evenly across the ENTIRE width (far-left to far-right)
-      // Plant i === 0 is the spotlight FIRST peony at center: rises and blooms right in the first 8s!
-      // All remaining plants awaken right after and fill the whole garden in rolling waves.
+      // Create 3 lush depth bands evenly across the ENTIRE width (far-left to far-right).
+      // ALL stems grow up together across the whole garden right from the start!
       for (let i = 0; i < count; i++) {
-        const isFirstBloom = i === 0;
         const isHero = i < heroCount;
 
         // Depth (0 = far background, 1 = close foreground)
@@ -1577,11 +1577,8 @@
         let depth;
         let xNorm;
 
-        if (isFirstBloom) {
-          depth = 0.96;
-          xNorm = 0.5;
-        } else if (isHero) {
-          depth = 0.76 + rng() * 0.2;
+        if (isHero) {
+          depth = 0.76 + rng() * 0.22;
           const heroSlots = [0.5, 0.36, 0.64, 0.22, 0.78, 0.09, 0.91];
           xNorm = clamp(heroSlots[i % heroSlots.length] + (rng() - 0.5) * 0.04, 0.03, 0.97);
         } else {
@@ -1590,7 +1587,7 @@
           xNorm = clamp(slot + (rng() - 0.5) * (0.85 / nonHeroCount), -0.02, 1.02);
 
           const depthSeq = (j * 0.6180339887498949 + 0.19) % 1;
-          depth = clamp(0.08 + depthSeq * 0.88 + (rng() - 0.5) * 0.08, 0.06, 0.95);
+          depth = clamp(0.08 + depthSeq * 0.9 + (rng() - 0.5) * 0.08, 0.06, 0.99);
         }
 
         const rootX = xNorm * W;
@@ -1598,32 +1595,28 @@
 
         // Height: lush rolling garden meadow contour with both tall back blooms & lower foreground blooms
         const edgeLift = Math.abs(xNorm - 0.5) * 0.07;
-        const heightFrac = isFirstBloom
-          ? isPortrait ? 0.43 : 0.47
-          : isHero
-          ? lerp(0.35, 0.52, rng())
+        const heightFrac = isHero
+          ? lerp(0.36, 0.53, rng())
           : lerp(0.18, 0.57, 0.25 + (1 - depth) * 0.4 + rng() * 0.36 + edgeLift);
 
-        // Keep top sky open (~36-42% clear) so moon, stars, and romantic messages shine clearly!
+        // Keep top sky open (~36-42% clear) so moon, stars, butterflies, and romantic messages shine clearly!
         const clampedHeightFrac = clamp(heightFrac, 0.17, isPortrait ? 0.52 : 0.58);
         const stemHeight = H * clampedHeightFrac;
 
-        // Natural gentle lean (keep the first spotlight peony poised gracefully near dead-center)
+        // Natural gentle lean (keep edge flowers hugging close to screen edges so no left/right gap forms)
         const maxLean = W * (isPortrait ? 0.11 : 0.075);
-        const lean = isFirstBloom ? (rng() - 0.5) * W * 0.018 : (rng() - 0.5) * maxLean;
+        const lean = (rng() - 0.5) * maxLean;
         const tipX = clamp(rootX + lean, -W * 0.01, W * 1.01);
         const tipY = H - stemHeight;
 
         const curveDir = (rng() - 0.5) * 2;
-        const ctrl1X = lerp(rootX, tipX, 0.32) + curveDir * stemHeight * (isFirstBloom ? 0.05 : 0.12);
+        const ctrl1X = lerp(rootX, tipX, 0.32) + curveDir * stemHeight * 0.12;
         const ctrl1Y = lerp(rootY, tipY, 0.35);
-        const ctrl2X = lerp(rootX, tipX, 0.7) - curveDir * stemHeight * (isFirstBloom ? 0.04 : 0.08);
+        const ctrl2X = lerp(rootX, tipX, 0.7) - curveDir * stemHeight * 0.08;
         const ctrl2Y = lerp(rootY, tipY, 0.72);
 
-        // Pick peony palette (first spotlight peony is signature Moonlit Blush!)
-        const palIndex = isFirstBloom
-          ? 0
-          : isHero
+        // Pick peony palette with balanced romantic harmony
+        const palIndex = isHero
           ? i % CONFIG.peonyPalettes.length
           : Math.floor(rng() * CONFIG.peonyPalettes.length);
         const palette = CONFIG.peonyPalettes[palIndex];
@@ -1632,58 +1625,30 @@
         const radius =
           baseRadius *
           lerp(0.56, 1.18, depth) *
-          (isFirstBloom ? 1.24 : isHero ? 1.12 : 0.84 + rng() * 0.34);
+          (isHero ? 1.14 : 0.84 + rng() * 0.34);
 
-        // Choreographed Timeline:
-        // - ALL stems & leaves across the whole garden grow together right from the start!
-        // - First hero flower (i === 0) finishes blooming RIGHT at 8.0s on the song beat!
-        // - All remaining flowers follow blooming gracefully in waves across the whole garden.
-        let stemStart;
-        let stemDuration;
-        let budStart;
-        let budDuration;
-        let bloomStart;
-        let bloomDuration;
+        // Unified lush meadow timeline:
+        // All stems rise together across the whole garden right away (~1s-6s),
+        // buds swell across the meadow, first flowers open right around ~8s,
+        // and the entire garden cascades smoothly into full bloom!
+        const centerDist = Math.abs(xNorm - 0.5) * 2;
+        const waveDelay = isHero
+          ? i * 0.014
+          : 0.02 + centerDist * 0.09 + rng() * 0.1;
 
-        if (isFirstBloom) {
-          stemStart = secToNorm(firstFinishSec * 0.1); // ~0.8s
-          stemDuration = secToNorm(firstFinishSec * 0.4); // ~0.8s -> 4.0s
-          budStart = secToNorm(firstFinishSec * 0.4); // ~3.2s
-          budDuration = secToNorm(firstFinishSec * 0.2); // ~3.2s -> 4.8s
-          bloomStart = secToNorm(firstFinishSec * 0.575); // ~4.6s
-          bloomDuration = secToNorm(firstFinishSec * 0.425); // ~4.6s -> 8.0s EXACT!
-        } else {
-          const centerDist = Math.abs(xNorm - 0.5) * 2; // 0 at center, 1 at far left/right
+        const stemStart = clamp(0.03 + waveDelay * 0.48, 0.025, 0.14);
+        const stemDuration = 0.12 + rng() * 0.06;
 
-          // All other stems grow up together right from the start (no lonely single stem!)
-          const stemStartSec = 1.0 + centerDist * 2.3 + rng() * 2.5; // ~1.0s -> 5.8s
-          const stemDurSec = 4.2 + rng() * 2.4; // ~4.2s -> 6.6s
-          stemStart = clamp(secToNorm(stemStartSec), 0.02, 0.22);
-          stemDuration = clamp(secToNorm(stemDurSec), 0.09, 0.19);
+        const budStart = clamp(stemStart + stemDuration * 0.72, 0.11, 0.27);
+        const budDuration = 0.065 + rng() * 0.035;
 
-          budStart = clamp(stemStart + stemDuration * 0.72, 0.09, 0.34);
-          budDuration = clamp(secToNorm(2.6 + rng() * 1.4), 0.055, 0.11);
-
-          // Remaining flowers start blooming right after the first flower blooms at 8.0s!
-          const afterFirst = secToNorm(firstFinishSec + 0.4); // ~8.4s
-          if (isHero) {
-            bloomStart = clamp(afterFirst + (i - 1) * secToNorm(1.65), afterFirst, 0.55);
-          } else {
-            bloomStart = clamp(
-              afterFirst + secToNorm(0.8 + centerDist * 7.8 + rng() * 11.5),
-              afterFirst,
-              0.72
-            );
-          }
-          bloomDuration = clamp(secToNorm(5.8 + rng() * 3.0), 0.12, 0.91 - bloomStart);
-        }
+        const bloomStart = isHero
+          ? clamp(0.16 + i * 0.042, 0.15, 0.44)
+          : clamp(0.2 + centerDist * 0.18 + rng() * 0.24, 0.19, 0.68);
+        const bloomDuration = clamp(0.15 + rng() * 0.08, 0.13, 0.9 - bloomStart);
 
         // Compound leaves along each stem (2 to 4 alternating leaf clusters)
-        const leafCount = isFirstBloom
-          ? 4
-          : depth > 0.5
-          ? 3 + (rng() > 0.5 ? 1 : 0)
-          : 2 + (rng() > 0.45 ? 1 : 0);
+        const leafCount = depth > 0.5 ? 3 + (rng() > 0.5 ? 1 : 0) : 2 + (rng() > 0.45 ? 1 : 0);
         const leaves = [];
         for (let l = 0; l < leafCount; l++) {
           const t = lerp(0.24, 0.76, (l + 0.35) / leafCount) + (rng() - 0.5) * 0.05;
@@ -1693,8 +1658,8 @@
             side,
             size: radius * (0.58 + rng() * 0.32),
             angleJitter: (rng() - 0.5) * 0.24,
-            leafStart: clamp(stemStart + stemDuration * t * 0.88, 0.02, 0.4),
-            leafDuration: isFirstBloom ? secToNorm(1.5) : 0.08 + rng() * 0.04,
+            leafStart: clamp(stemStart + stemDuration * t * 0.88, 0.04, 0.3),
+            leafDuration: 0.08 + rng() * 0.04,
           });
         }
 
@@ -1706,20 +1671,20 @@
           budDuration,
           bloomStart,
           bloomDuration,
-          facingTilt: isFirstBloom ? 0.88 : 0.74 + rng() * 0.2,
-          tiltAngle: isFirstBloom ? 0.04 : (rng() - 0.5) * 0.52,
+          facingTilt: 0.74 + rng() * 0.2,
+          tiltAngle: (rng() - 0.5) * 0.52,
           tierScale: this.quality.tierScale,
           seed: Math.floor(rng() * 1e9),
         });
 
-        // Add graceful secondary branch with smaller peony or delicate bud on ~52% of plants
+        // Add graceful secondary branch with smaller peony or delicate bud on ~54% of plants
         let branch = null;
-        if (!isFirstBloom && rng() < 0.54 && stemHeight > H * 0.26) {
+        if (rng() < 0.54 && stemHeight > H * 0.26) {
           const side = rng() > 0.5 ? 1 : -1;
           const attachT = 0.44 + rng() * 0.2;
           const bLen = stemHeight * (0.24 + rng() * 0.14);
           const bRadius = radius * (0.54 + rng() * 0.22);
-          const bStart = clamp(stemStart + stemDuration * 0.65, 0.1, 0.36);
+          const bStart = clamp(stemStart + stemDuration * 0.65, 0.1, 0.3);
           const bDur = 0.1 + rng() * 0.04;
           const isStayingHalfBud = rng() < 0.22; // Keep a few tender half-open buds for botanical realism!
 
@@ -1732,13 +1697,13 @@
             head: new PeonyHead({
               radius: bRadius,
               palette,
-              depth: clamp(depth - 0.08, 0.05, 0.94),
-              budStart: clamp(bStart + bDur * 0.75, 0.2, 0.48),
+              depth: clamp(depth - 0.08, 0.05, 0.95),
+              budStart: clamp(bStart + bDur * 0.75, 0.2, 0.44),
               budDuration: 0.075,
               bloomStart: isStayingHalfBud
-                ? 0.8
-                : clamp(bloomStart + 0.05 + rng() * 0.07, 0.28, 0.78),
-              bloomDuration: isStayingHalfBud ? 0.42 : 0.13,
+                ? 0.78
+                : clamp(bloomStart + 0.05 + rng() * 0.08, 0.26, 0.76),
+              bloomDuration: isStayingHalfBud ? 0.42 : 0.14,
               facingTilt: 0.72 + rng() * 0.22,
               tiltAngle: side * (0.2 + rng() * 0.35),
               tierScale: this.quality.tierScale * 0.85,
@@ -1825,6 +1790,221 @@
       }
     }
 
+    // Build magical luminous moonlit butterflies fluttering over the peony garden
+    buildButterflies() {
+      const rng = createRng(73109);
+      const wingPalettes = [
+        { inner: "#8c2f66", mid: "#f5a5c8", edge: "#fff0f7", spot: "#fff6d1", glow: "pink" },
+        { inner: "#4d277c", mid: "#c7a4f5", edge: "#f5edff", spot: "#ffe9b8", glow: "lavender" },
+        { inner: "#8c5b2a", mid: "#f5cf87", edge: "#fff8e3", spot: "#ffffff", glow: "gold" },
+        { inner: "#54478c", mid: "#dcd6ff", edge: "#ffffff", spot: "#ffe2b8", glow: "pearl" },
+      ];
+
+      this.butterflies = [];
+      const count = this.quality.butterflyCount || 7;
+      for (let i = 0; i < count; i++) {
+        const fromLeft = i % 2 === 0;
+        const size = clamp(Math.min(this.width, this.height) * (0.017 + rng() * 0.011), 9.5, 19);
+        this.butterflies.push({
+          x: fromLeft ? -30 - rng() * 80 : this.width + 30 + rng() * 80,
+          y: this.height * (0.24 + rng() * 0.42),
+          vx: (fromLeft ? 1 : -1) * (24 + rng() * 22),
+          vy: (rng() - 0.5) * 14,
+          targetX: this.width * (0.15 + rng() * 0.7),
+          targetY: this.height * (0.26 + rng() * 0.44),
+          hoverTimer: 0,
+          retargetTimer: 1.5 + rng() * 3.5,
+          flapPhase: rng() * TAU,
+          flapSpeed: 8.2 + rng() * 3.6,
+          glidePhase: rng() * TAU,
+          size,
+          palette: wingPalettes[i % wingPalettes.length],
+          enterNorm: 0.14 + (i / count) * 0.36, // Enter smoothly as peonies begin blooming!
+          sparkleTimer: rng() * 0.6,
+        });
+      }
+    }
+
+    pickButterflyTarget(b) {
+      // Gently steer toward an open peony flower head (~72% chance) or dreamy open twilight sky
+      if (this.plants.length > 0 && Math.random() < 0.72) {
+        const plant = this.plants[Math.floor(Math.random() * this.plants.length)];
+        b.targetX = clamp(plant.tipX + (Math.random() - 0.5) * 46, 36, this.width - 36);
+        b.targetY = clamp(plant.tipY - 18 - Math.random() * 44, this.height * 0.16, this.height * 0.74);
+      } else {
+        b.targetX = this.width * (0.12 + Math.random() * 0.76);
+        b.targetY = this.height * (0.18 + Math.random() * 0.44);
+      }
+      b.retargetTimer = 2.6 + Math.random() * 3.6;
+    }
+
+    drawSingleButterfly(ctx, b, alpha, beatPulse) {
+      // Smooth 3D wing-flapping perspective with natural brief open-wing glides
+      const glideMod = Math.sin(this.totalElapsed * 0.85 + b.glidePhase) > 0.74 ? 0.35 : 1;
+      const flapVal = Math.sin(b.flapPhase);
+      const wingSpan = lerp(0.18, 1.0, (flapVal + 1) * 0.5);
+      const bodyBob = -flapVal * b.size * 0.14;
+
+      const speed = Math.hypot(b.vx, b.vy);
+      const heading = speed > 4 ? Math.atan2(b.vy, b.vx) + Math.PI * 0.5 : 0;
+      const tilt = clamp(heading * 0.48, -0.78, 0.78);
+
+      // Soft luminous fairy aura around each butterfly
+      const spr = this.glowSprites[b.palette.glow] || this.glowSprites.pink;
+      const haloR = b.size * (2.3 + beatPulse * 0.55);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = alpha * (0.34 + beatPulse * 0.22);
+      ctx.drawImage(spr, b.x - haloR, b.y + bodyBob - haloR, haloR * 2, haloR * 2);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(b.x, b.y + bodyBob);
+      ctx.rotate(tilt);
+      ctx.globalAlpha = alpha;
+
+      const S = b.size;
+      const pal = b.palette;
+
+      // Draw symmetric left (-1) and right (+1) layered silk wings with 3D flap squash
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.scale(side * wingSpan, 1);
+
+        // 1. Upper Forewing
+        ctx.beginPath();
+        ctx.moveTo(0, -S * 0.12);
+        ctx.bezierCurveTo(S * 0.58, -S * 1.18, S * 1.52, -S * 0.82, S * 1.24, -S * 0.06);
+        ctx.bezierCurveTo(S * 1.02, S * 0.34, S * 0.42, S * 0.22, 0, S * 0.06);
+        ctx.closePath();
+
+        const fg = ctx.createLinearGradient(0, 0, S * 1.28, -S * 0.78);
+        fg.addColorStop(0, pal.inner);
+        fg.addColorStop(0.48, pal.mid);
+        fg.addColorStop(1, pal.edge);
+        ctx.fillStyle = fg;
+        ctx.fill();
+
+        // Delicate luminous rim & pearl wingtip dots
+        ctx.strokeStyle = "rgba(255, 250, 244, 0.52)";
+        ctx.lineWidth = Math.max(0.55, S * 0.045);
+        ctx.stroke();
+
+        ctx.fillStyle = pal.spot;
+        ctx.beginPath();
+        ctx.arc(S * 0.88, -S * 0.42, S * 0.11, 0, TAU);
+        ctx.arc(S * 0.62, -S * 0.56, S * 0.07, 0, TAU);
+        ctx.fill();
+
+        // 2. Lower Hindwing
+        ctx.beginPath();
+        ctx.moveTo(0, S * 0.02);
+        ctx.bezierCurveTo(S * 0.64, S * 0.06, S * 1.06, S * 0.54, S * 0.68, S * 0.94);
+        ctx.bezierCurveTo(S * 0.42, S * 1.14, S * 0.06, S * 0.74, 0, S * 0.36);
+        ctx.closePath();
+
+        const hg = ctx.createLinearGradient(0, S * 0.06, S * 0.86, S * 0.92);
+        hg.addColorStop(0, pal.inner);
+        hg.addColorStop(0.55, pal.mid);
+        hg.addColorStop(1, pal.edge);
+        ctx.fillStyle = hg;
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255, 248, 242, 0.42)";
+        ctx.lineWidth = Math.max(0.5, S * 0.04);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      // Slender twilight-gold body & curving antennae
+      ctx.fillStyle = "#fff1dc";
+      ctx.beginPath();
+      ctx.ellipse(0, S * 0.08, S * 0.09, S * 0.44, 0, 0, TAU);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255, 236, 200, 0.78)";
+      ctx.lineWidth = Math.max(0.55, S * 0.045);
+      ctx.beginPath();
+      ctx.moveTo(-S * 0.04, -S * 0.3);
+      ctx.quadraticCurveTo(-S * 0.26, -S * 0.68, -S * 0.38, -S * 0.74);
+      ctx.moveTo(S * 0.04, -S * 0.3);
+      ctx.quadraticCurveTo(S * 0.26, -S * 0.68, S * 0.38, -S * 0.74);
+      ctx.stroke();
+
+      ctx.restore();
+      return glideMod;
+    }
+
+    updateAndDrawButterflies(ctx, dt, normTime) {
+      if (this.mode === "landing" || !this.butterflies.length) return;
+      const moveScale = this.reducedMotion ? 0.35 : 1;
+
+      for (const b of this.butterflies) {
+        const entryAlpha = invLerp(b.enterNorm, b.enterNorm + 0.08, normTime);
+        if (entryAlpha <= 0.01) continue;
+
+        const glideMod = Math.sin(this.totalElapsed * 0.85 + b.glidePhase) > 0.74 ? 0.35 : 1;
+        b.flapPhase += dt * b.flapSpeed * glideMod * (1 + this.beatPulse * 0.45);
+
+        const dx = b.targetX - b.x;
+        const dy = b.targetY - b.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (b.hoverTimer > 0) {
+          // Hover softly over a blooming peony
+          b.hoverTimer -= dt;
+          b.vx = lerp(b.vx, Math.sin(this.totalElapsed * 2.1 + b.glidePhase) * 14, dt * 3);
+          b.vy = lerp(b.vy, Math.cos(this.totalElapsed * 2.6 + b.glidePhase) * 9, dt * 3);
+          if (b.hoverTimer <= 0) {
+            this.pickButterflyTarget(b);
+          }
+        } else {
+          // Graceful curved steering toward target flower
+          b.retargetTimer -= dt;
+          if (dist < 24) {
+            b.hoverTimer = 1.2 + Math.random() * 2.0;
+          } else if (b.retargetTimer <= 0) {
+            this.pickButterflyTarget(b);
+          }
+
+          const desiredSpeed = clamp(dist * 0.45, 22, 68);
+          const nx = dx / (dist || 1);
+          const ny = dy / (dist || 1);
+          // Organic gentle weaving perpendicular to flight path
+          const weave = Math.sin(this.totalElapsed * 2.4 + b.glidePhase) * 18;
+          const targetVx = nx * desiredSpeed - ny * weave;
+          const targetVy = ny * desiredSpeed + nx * weave;
+
+          b.vx = lerp(b.vx, targetVx, clamp(dt * 1.9, 0, 1));
+          b.vy = lerp(b.vy, targetVy, clamp(dt * 1.9, 0, 1));
+        }
+
+        b.x += b.vx * dt * moveScale;
+        b.y += b.vy * dt * moveScale;
+
+        // Soft fairy-dust trail shedding occasionally from wings
+        b.sparkleTimer -= dt;
+        if (b.sparkleTimer <= 0 && !this.reducedMotion) {
+          b.sparkleTimer = 0.28 + Math.random() * 0.45;
+          if (this.sparkles.length < 200) {
+            this.sparkles.push({
+              x: b.x + (Math.random() - 0.5) * 10,
+              y: b.y + (Math.random() - 0.5) * 8,
+              vx: -b.vx * 0.15 + (Math.random() - 0.5) * 10,
+              vy: 4 + Math.random() * 10,
+              life: 0,
+              maxLife: 0.85 + Math.random() * 0.8,
+              size: 3 + Math.random() * 4.5,
+              color: Math.random() < 0.55 ? "gold" : b.palette.glow,
+            });
+          }
+        }
+
+        this.drawSingleButterfly(ctx, b, entryAlpha * 0.94, this.beatPulse);
+      }
+    }
+
     spawnSparkleBurst(x, y, colorKey, count = 12) {
       if (this.sparkles.length > 220) return;
       for (let i = 0; i < count; i++) {
@@ -1874,6 +2054,7 @@
         if (plant.branch) plant.branch.head.sparkleEmitted = false;
       }
       this.buildGatheringLights();
+      this.buildButterflies();
     }
 
     // Compute smooth cinematic virtual camera (starts zoomed in on hero peonies -> zooms out to reveal whole garden)
@@ -2173,7 +2354,7 @@
         this.spawnSparkleBurst(clientX, clientY, "gold", 1);
       }
 
-      // Send a whisper of breeze through nearby peonies
+      // Send a whisper of breeze through nearby peonies & playfully flutter nearby butterflies
       const dx = this.lastPointer ? clientX - this.lastPointer.x : 0;
       const push = isTap ? (Math.random() > 0.5 ? 16 : -16) : clamp(dx * 0.45, -18, 18);
 
@@ -2182,6 +2363,18 @@
         if (dist < 170) {
           const influence = 1 - dist / 170;
           plant.localImpulse = clamp(plant.localImpulse + push * influence * 0.55, -26, 26);
+        }
+      }
+
+      if (isTap) {
+        for (const b of this.butterflies) {
+          const bDist = Math.hypot(b.x - clientX, b.y - clientY);
+          if (bDist < 150) {
+            b.hoverTimer = 0;
+            b.vy = -52 - Math.random() * 26;
+            b.vx += (b.x >= clientX ? 1 : -1) * 32;
+            this.pickButterflyTarget(b);
+          }
         }
       }
 
@@ -2227,40 +2420,27 @@
       }
 
       if (this.mode === "blooming") {
-        // Lock the first 8 seconds strictly 1:1 with real song time so Flower #1 hits full bloom
-        // RIGHT at 8.0s on the beat; after 8.5s let the rest of the garden breathe gently with the melody.
-        if (this.bloomElapsed < CONFIG.firstBloomSec + 0.5) {
-          this.bloomElapsed += dt;
-        } else {
-          const beatPace = clamp(
-            0.94 + (this.beatEnergy - 0.3) * 0.3 + this.beatPulse * 0.36,
-            0.84,
-            1.34
-          );
-          this.bloomElapsed += dt * beatPace;
-        }
+        // Smooth beat-synced blooming centered around ~1.0x (~40-42s total)
+        const beatPace = clamp(
+          0.9 + (this.beatEnergy - 0.3) * 0.34 + this.beatPulse * 0.4,
+          0.8,
+          1.38
+        );
+        this.bloomElapsed += dt * beatPace;
       }
 
-      // Emit soft rising golden sparkles when a strong beat hits (starting right as Flower #1 opens!)
+      // Emit soft rising golden sparkles from a blooming peony when a strong beat hits
       this.beatSparkleCooldown = Math.max(0, this.beatSparkleCooldown - dt);
       if (
         this.mode !== "landing" &&
-        this.beatPulse > 0.3 &&
+        this.beatPulse > 0.32 &&
         this.beatSparkleCooldown <= 0 &&
         this.plants.length > 0 &&
-        this.bloomElapsed > 3.5
+        normTime > 0.18
       ) {
-        this.beatSparkleCooldown = 0.45;
-        if (this.bloomElapsed <= CONFIG.firstBloomSec + 0.8) {
-          // Focus beat sparkles right on the spotlight first peony during the first 8 seconds!
-          const firstPlant = this.plants.find((pl) => pl.id === 0);
-          if (firstPlant) {
-            this.spawnSparkleBurst(firstPlant.tipX, firstPlant.tipY, "gold", 6);
-          }
-        } else {
-          const pick = this.plants[Math.floor(Math.random() * this.plants.length)];
-          this.spawnSparkleBurst(pick.tipX, pick.tipY, pick.primaryHead.palette.glow, 4);
-        }
+        this.beatSparkleCooldown = 0.44;
+        const pick = this.plants[Math.floor(Math.random() * this.plants.length)];
+        this.spawnSparkleBurst(pick.tipX, pick.tipY, pick.primaryHead.palette.glow, 4);
       }
 
       // Trigger romantic message sequence right after grand zoom-out finishes!
@@ -2330,11 +2510,14 @@
         }
       }
 
-      // 6. Soft drifting silk petals & bloom sparkles
+      // 6. Magical luminous butterflies fluttering between the blooming peonies
+      this.updateAndDrawButterflies(ctx, dt, normTime);
+
+      // 7. Soft drifting silk petals & bloom sparkles
       this.updateAndDrawDriftingPetals(ctx, dt, normTime);
       this.updateAndDrawSparkles(ctx, dt);
 
-      // 7. Foreground luminous fireflies & bokeh light motes
+      // 8. Foreground luminous fireflies & bokeh light motes
       this.updateAndDrawFireflies(
         ctx,
         dt,
