@@ -168,12 +168,15 @@ body {
 .music-pill.is-playing .sound-bars span:nth-child(1) {
   animation-delay: 0s;
 }
+
 .music-pill.is-playing .sound-bars span:nth-child(2) {
   animation-delay: 0.22s;
 }
+
 .music-pill.is-playing .sound-bars span:nth-child(3) {
   animation-delay: 0.44s;
 }
+
 .music-pill.is-playing .sound-bars span:nth-child(4) {
   animation-delay: 0.16s;
 }
@@ -184,9 +187,12 @@ body {
 }
 
 @keyframes soundPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     height: 4px;
   }
+
   50% {
     height: 14px;
   }
@@ -204,12 +210,10 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: radial-gradient(
-    ellipse at 50% 48%,
-    rgba(28, 15, 51, 0.58) 0%,
-    rgba(10, 14, 36, 0.78) 60%,
-    rgba(6, 9, 24, 0.9) 100%
-  );
+  background: radial-gradient(ellipse at 50% 48%,
+      rgba(28, 15, 51, 0.58) 0%,
+      rgba(10, 14, 36, 0.78) 60%,
+      rgba(6, 9, 24, 0.9) 100%);
   transition:
     opacity 1.8s var(--ease-cinematic),
     transform 1.8s var(--ease-cinematic),
@@ -237,6 +241,7 @@ body {
     opacity: 0;
     transform: translateY(22px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -301,12 +306,10 @@ body {
   padding: 15px 38px;
   border-radius: 999px;
   border: 1px solid rgba(244, 208, 140, 0.55);
-  background: linear-gradient(
-    135deg,
-    rgba(66, 30, 96, 0.68) 0%,
-    rgba(130, 56, 108, 0.52) 55%,
-    rgba(46, 26, 78, 0.72) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(66, 30, 96, 0.68) 0%,
+      rgba(130, 56, 108, 0.52) 55%,
+      rgba(46, 26, 78, 0.72) 100%);
   color: var(--cream);
   font-family: var(--font-serif);
   font-size: clamp(1.06rem, 2.2vw, 1.2rem);
@@ -331,12 +334,10 @@ body {
 .ethereal-btn .btn-glow {
   position: absolute;
   inset: -40%;
-  background: linear-gradient(
-    115deg,
-    transparent 35%,
-    rgba(255, 244, 214, 0.34) 50%,
-    transparent 65%
-  );
+  background: linear-gradient(115deg,
+      transparent 35%,
+      rgba(255, 244, 214, 0.34) 50%,
+      transparent 65%);
   transform: translateX(-110%);
   transition: transform 0.9s var(--ease-cinematic);
   pointer-events: none;
@@ -397,12 +398,10 @@ body {
   gap: clamp(10px, 1.8vh, 18px);
   padding: 20px 26px;
   border-radius: 28px;
-  background: radial-gradient(
-    ellipse at 50% 45%,
-    rgba(10, 12, 32, 0.44) 0%,
-    rgba(10, 12, 32, 0.16) 62%,
-    transparent 100%
-  );
+  background: radial-gradient(ellipse at 50% 45%,
+      rgba(10, 12, 32, 0.44) 0%,
+      rgba(10, 12, 32, 0.16) 62%,
+      transparent 100%);
 }
 
 .romantic-line {
@@ -457,6 +456,11 @@ body {
 
 .letter-cta-wrap {
   margin-top: clamp(12px, 2.4vh, 24px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   opacity: 0;
   transform: translateY(16px);
   pointer-events: none;
@@ -476,12 +480,15 @@ body {
 }
 
 @keyframes gentleBreathe {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow:
       0 0 28px rgba(246, 178, 201, 0.28),
       0 0 58px rgba(244, 208, 140, 0.16),
       inset 0 1px 0 rgba(255, 247, 236, 0.35);
   }
+
   50% {
     box-shadow:
       0 0 42px rgba(246, 178, 201, 0.46),
@@ -490,19 +497,317 @@ body {
   }
 }
 
-/* Floating Re-open Letter Pill */
+/* Floating Re-open Letter & Lockscreen Photo Bar */
 .reopen-bar {
   position: fixed;
   bottom: max(22px, env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   z-index: 25;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 28px);
   transition: opacity 0.8s var(--ease-cinematic), transform 0.8s var(--ease-cinematic), visibility 0.8s linear;
 }
 
 .reopen-btn {
-  padding: 12px 28px;
+  padding: 12px 26px;
+  font-size: 0.94rem;
+}
+
+.secondary-glass-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(244, 208, 140, 0.34);
+  background: rgba(16, 12, 36, 0.56);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--cream);
+  font-family: var(--font-serif);
+  font-size: 0.94rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 6px 24px rgba(6, 9, 24, 0.42);
+  transition:
+    background 0.35s var(--ease-gentle),
+    border-color 0.35s var(--ease-gentle),
+    transform 0.3s var(--ease-cinematic),
+    box-shadow 0.35s ease;
+}
+
+.secondary-glass-btn svg,
+.photo-pill svg {
+  width: 16px;
+  height: 16px;
+  color: var(--warm-gold);
+  flex-shrink: 0;
+}
+
+.secondary-glass-btn:hover,
+.secondary-glass-btn:focus-visible {
+  background: rgba(42, 22, 68, 0.78);
+  border-color: rgba(244, 208, 140, 0.68);
+  box-shadow: 0 0 26px rgba(244, 208, 140, 0.22);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.secondary-glass-btn:active {
+  transform: scale(0.97);
+}
+
+/* Camera Shutter Moonlight Flash */
+.shutter-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 250, 238, 0.92) 0%, rgba(246, 212, 230, 0.65) 100%);
+}
+
+.shutter-flash.is-flashing {
+  animation: moonlightShutter 0.42s var(--ease-cinematic) forwards;
+}
+
+@keyframes moonlightShutter {
+  0% {
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 0.85;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Clean Screenshot Mode (hides all UI overlays so user can take pure lockscreen screenshots) */
+body.is-clean-mode .garden-hud,
+body.is-clean-mode .message-overlay,
+body.is-clean-mode .reopen-bar {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+.clean-mode-toast {
+  position: fixed;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(14, 11, 30, 0.72);
+  border: 1px solid rgba(244, 208, 140, 0.34);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--cream);
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+  transition: opacity 0.6s ease, visibility 0.6s linear;
+}
+
+/* ==========================================================================
+   4. Lockscreen Photo Preview & Save Modal
+   ========================================================================== */
+
+.photo-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  transition: opacity 0.45s var(--ease-gentle), visibility 0.45s linear;
+}
+
+.photo-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 9, 24, 0.76);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.photo-sheet {
+  position: relative;
+  z-index: 2;
+  width: min(460px, 100%);
+  max-height: min(92vh, 92dvh);
+  overflow-y: auto;
+  padding: 24px 20px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(244, 208, 140, 0.36);
+  background: linear-gradient(165deg, rgba(30, 16, 54, 0.94) 0%, rgba(12, 16, 40, 0.96) 100%);
+  box-shadow:
+    0 24px 70px rgba(4, 6, 18, 0.75),
+    0 0 55px rgba(246, 178, 201, 0.16);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.photo-close-x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(244, 208, 140, 0.28);
+  background: rgba(255, 247, 236, 0.08);
+  color: var(--cream);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.25s ease, transform 0.25s ease;
+}
+
+.photo-close-x svg {
+  width: 16px;
+  height: 16px;
+}
+
+.photo-close-x:hover,
+.photo-close-x:focus-visible {
+  background: rgba(246, 178, 201, 0.22);
+  transform: rotate(90deg);
+  outline: none;
+}
+
+.photo-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 1.55rem;
+  color: var(--cream);
+  letter-spacing: 0.03em;
+  padding-right: 26px;
+  padding-left: 26px;
+}
+
+.photo-subtitle {
+  font-family: var(--font-serif);
+  font-style: italic;
   font-size: 0.96rem;
+  color: var(--lavender-soft);
+  opacity: 0.85;
+  margin-top: -6px;
+}
+
+.photo-frame {
+  width: 100%;
+  max-height: min(48vh, 460px);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(244, 208, 140, 0.4);
+  background: var(--midnight-deep);
+  box-shadow: 0 12px 34px rgba(4, 6, 18, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(48vh, 460px);
+  object-fit: contain;
+  user-select: auto;
+  -webkit-touch-callout: default;
+}
+
+.quote-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-family: var(--font-serif);
+  font-size: 0.96rem;
+  color: var(--lavender-soft);
+  margin-top: 2px;
+}
+
+.quote-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(244, 208, 140, 0.35);
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--cream);
+  transition: transform 0.25s var(--ease-cinematic), background 0.25s ease;
+}
+
+.quote-toggle input:checked+.toggle-track {
+  background: rgba(232, 134, 174, 0.55);
+  border-color: var(--warm-gold);
+}
+
+.quote-toggle input:checked+.toggle-track::after {
+  transform: translateX(16px);
+  background: var(--warm-gold);
+}
+
+.photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.photo-save-btn {
+  padding: 12px 26px;
+  font-size: 0.95rem;
+}
+
+.photo-tip {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(230, 216, 250, 0.68);
+  max-width: 360px;
 }
 
 /* ==========================================================================
@@ -524,11 +829,9 @@ body {
 .letter-backdrop {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(24, 12, 42, 0.42) 0%,
-    rgba(7, 10, 26, 0.62) 100%
-  );
+  background: radial-gradient(circle at 50% 50%,
+      rgba(24, 12, 42, 0.42) 0%,
+      rgba(7, 10, 26, 0.62) 100%);
   backdrop-filter: blur(3.5px);
   -webkit-backdrop-filter: blur(3.5px);
 }
@@ -566,22 +869,23 @@ body {
   width: 340px;
   height: 260px;
   border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(244, 208, 140, 0.34) 0%,
-    rgba(246, 178, 201, 0.2) 45%,
-    transparent 72%
-  );
+  background: radial-gradient(circle,
+      rgba(244, 208, 140, 0.34) 0%,
+      rgba(246, 178, 201, 0.2) 45%,
+      transparent 72%);
   filter: blur(22px);
   pointer-events: none;
   animation: auraPulse 2.8s ease-in-out infinite;
 }
 
 @keyframes auraPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(0.95);
     opacity: 0.78;
   }
+
   50% {
     transform: scale(1.08);
     opacity: 1;
@@ -763,13 +1067,11 @@ body {
   position: absolute;
   inset: -1px;
   border-radius: 18px;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 247, 236, 0.45) 0%,
-    transparent 35%,
-    transparent 65%,
-    rgba(246, 178, 201, 0.22) 100%
-  );
+  background: linear-gradient(145deg,
+      rgba(255, 247, 236, 0.45) 0%,
+      transparent 35%,
+      transparent 65%,
+      rgba(246, 178, 201, 0.22) 100%);
   pointer-events: none;
 }
 
@@ -1002,6 +1304,26 @@ body {
     padding: 14px 30px;
   }
 
+  .reopen-btn {
+    padding: 10px 18px;
+    font-size: 0.84rem;
+  }
+
+  .secondary-glass-btn {
+    padding: 10px 16px;
+    font-size: 0.84rem;
+  }
+
+  .hud-btn-text {
+    display: none;
+  }
+
+  .photo-pill {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
   .message-overlay {
     padding: max(62px, 8.5vh) 16px 20px;
   }
@@ -1037,6 +1359,7 @@ body {
 
 /* Reduced Motion Accessibility Fallback */
 @media (prefers-reduced-motion: reduce) {
+
   .landing-inner,
   .open-letter-btn,
   .envelope-aura,

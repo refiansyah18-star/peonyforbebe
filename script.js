@@ -14,11 +14,11 @@
   const queryDuration = parseFloat(urlParams.get("duration"));
 
   const CONFIG = {
-    // Full cinematic blooming duration in seconds (PRD: 60 - 120 seconds)
+    // Dreamy beat-synced blooming duration in seconds (~48s real-time; override via ?duration=XX)
     durationSec:
       Number.isFinite(queryDuration) && queryDuration >= 8 && queryDuration <= 240
         ? queryDuration
-        : 75,
+        : 48,
 
     // Target music volume (0.0 to 1.0)
     musicVolume: 0.72,
@@ -155,7 +155,7 @@
   }
 
   /* ------------------------------------------------------------------------
-     3. Audio Controller (Local Music + Ethereal Harp Fallback)
+     3. Audio Controller (Local Music + Real-Time Beat Analyser + Harp Fallback)
      Strictly starts ONLY after user interaction.
      ------------------------------------------------------------------------ */
   class AudioController {
@@ -166,6 +166,17 @@
       this.isPlaying = false;
       this.usingFallback = false;
       this.fadeRaf = null;
+
+      // Real-time Web Audio beat analyser
+      this.audioCtx = null;
+      this.analyser = null;
+      this.mediaSource = null;
+      this.freqData = null;
+      this.avgEnergy = 0.22;
+      this.smoothEnergy = 0;
+      this.beatPulse = 0;
+
+      // Fallback ethereal harp synth
       this.synthCtx = null;
       this.synthGain = null;
       this.synthTimer = null;
@@ -186,6 +197,72 @@
       }
     }
 
+    setupAnalyser() {
+      if (this.analyser || !this.audioEl || this.usingFallback) return;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      try {
+        this.audioCtx = new AudioCtx();
+        this.analyser = this.audioCtx.createAnalyser();
+        this.analyser.fftSize = 256;
+        this.analyser.smoothingTimeConstant = 0.76;
+        this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
+        this.mediaSource = this.audioCtx.createMediaElementSource(this.audioEl);
+        this.mediaSource.connect(this.analyser);
+        this.analyser.connect(this.audioCtx.destination);
+      } catch {
+        // Safely fall back to plain <audio> playback without breaking sound
+        this.analyser = null;
+      }
+    }
+
+    // Returns smoothed real-time musical energy & beat transient pulse (0..1)
+    getBeatMetrics(dt, elapsedSec) {
+      let rawEnergy = 0;
+      let hasLiveSignal = false;
+
+      if (this.isPlaying && this.analyser && this.freqData && !this.usingFallback) {
+        this.analyser.getByteFrequencyData(this.freqData);
+
+        let bassSum = 0;
+        for (let i = 1; i <= 8; i++) bassSum += this.freqData[i];
+        let midSum = 0;
+        for (let i = 9; i <= 34; i++) midSum += this.freqData[i];
+        let trebleSum = 0;
+        for (let i = 35; i <= 72; i++) trebleSum += this.freqData[i];
+
+        const bass = bassSum / (8 * 255);
+        const mid = midSum / (26 * 255);
+        const treble = trebleSum / (38 * 255);
+        rawEnergy = clamp(bass * 0.42 + mid * 0.44 + treble * 0.14, 0, 1);
+        hasLiveSignal = rawEnergy > 0.018;
+      }
+
+      if (!hasLiveSignal) {
+        // Gentle musical harp-wave cadence (~66 BPM slowed angelic feel) when muted or unsupported
+        const wave = 0.5 + 0.5 * Math.sin(elapsedSec * 2.25);
+        const swell = Math.pow(wave, 2.2);
+        rawEnergy = this.isPlaying ? 0.24 + swell * 0.42 : 0.2 + swell * 0.22;
+      }
+
+      this.avgEnergy = lerp(this.avgEnergy, rawEnergy, clamp(dt * 1.9, 0, 1));
+      const onset = Math.max(0, rawEnergy - this.avgEnergy * 1.05);
+      const targetPulse = clamp(onset * 5.2, 0, 1);
+
+      this.smoothEnergy = lerp(this.smoothEnergy, rawEnergy, clamp(dt * 8, 0, 1));
+      if (targetPulse > this.beatPulse) {
+        this.beatPulse = lerp(this.beatPulse, targetPulse, 0.65);
+      } else {
+        this.beatPulse *= Math.pow(0.06, dt);
+      }
+
+      return {
+        energy: this.smoothEnergy,
+        beatPulse: this.beatPulse,
+      };
+    }
+
     updateUI() {
       if (!this.toggleBtn || !this.labelEl) return;
       this.toggleBtn.classList.toggle("is-playing", this.isPlaying);
@@ -201,8 +278,12 @@
 
       if (!this.usingFallback && this.audioEl) {
         try {
+          this.setupAnalyser();
+          if (this.audioCtx && this.audioCtx.state === "suspended") {
+            this.audioCtx.resume().catch(() => {});
+          }
           await this.audioEl.play();
-          this.fadeAudioTo(CONFIG.musicVolume, 2200);
+          this.fadeAudioTo(CONFIG.musicVolume, 1600);
           return;
         } catch {
           this.usingFallback = true;
@@ -862,14 +943,19 @@
       this.bakedHalfSize = pad;
     }
 
-    draw(ctx, x, y, budP, bloomP, windRot, breatheScale, dpr, glowSprites) {
+    draw(ctx, x, y, budP, bloomP, windRot, breatheScale, dpr, glowSprites, beatEnergy = 0, beatPulse = 0) {
       if (budP <= 0.005) return;
 
-      // Soft magical halo behind blooming peony
+      // Soft magical halo behind blooming peony — gently swells with the music's beat!
       if (glowSprites && bloomP > 0.06) {
         const sprite = glowSprites[this.palette.glow] || glowSprites.pink;
-        const haloR = this.radius * lerp(1.15, 2.25, easeOutCubic(bloomP));
-        const haloAlpha = lerp(0.05, 0.24 + this.depth * 0.14, easeOutCubic(bloomP));
+        const beatBoost = 1 + beatEnergy * 0.16 + beatPulse * 0.24;
+        const haloR = this.radius * lerp(1.15, 2.28, easeOutCubic(bloomP)) * (1 + beatPulse * 0.12);
+        const haloAlpha = clamp(
+          lerp(0.06, 0.24 + this.depth * 0.14, easeOutCubic(bloomP)) * beatBoost,
+          0,
+          0.62
+        );
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
         ctx.globalAlpha = haloAlpha;
@@ -1064,18 +1150,20 @@
       ctx.restore();
     }
 
-    draw(ctx, normTime, elapsedSec, dpr, glowSprites, onBloomSparkle) {
+    draw(ctx, normTime, elapsedSec, dpr, glowSprites, onBloomSparkle, beatEnergy = 0, beatPulse = 0) {
       // Decay interactive touch/cursor wind impulse smoothly
       this.localImpulse *= 0.94;
 
       const stemP = invLerp(this.stemStart, this.stemStart + this.stemDuration, normTime);
       if (stemP <= 0.002) return;
 
-      // Organic layered night breeze sway
+      // Organic layered night breeze sway (subtle extra lift on music swells)
       const windWave =
         Math.sin(elapsedSec * this.windFreq + this.windPhase) * 0.65 +
         Math.sin(elapsedSec * (this.windFreq * 0.43) + this.windPhase * 1.7) * 0.35;
-      const windOffset = (windWave * this.windAmp + this.localImpulse) * easeOutCubic(stemP);
+      const windOffset =
+        (windWave * this.windAmp * (1 + beatEnergy * 0.14) + this.localImpulse) *
+        easeOutCubic(stemP);
 
       const [p0, p1, p2, p3] = this.getStemControlPoints(windOffset);
 
@@ -1140,7 +1228,10 @@
               bHead.bloomStart + bHead.bloomDuration,
               normTime
             );
-            const breathe = 1 + Math.sin(elapsedSec * 1.3 + this.windPhase + 1.2) * 0.015;
+            const breathe =
+              1 +
+              Math.sin(elapsedSec * 1.3 + this.windPhase + 1.2) * 0.015 +
+              beatPulse * 0.026;
             bHead.draw(
               ctx,
               brTip.x,
@@ -1150,7 +1241,9 @@
               windOffset * 0.0085,
               breathe,
               dpr,
-              glowSprites
+              glowSprites,
+              beatEnergy,
+              beatPulse
             );
 
             if (!bHead.sparkleEmitted && bloomP > 0.42) {
@@ -1166,7 +1259,10 @@
         const head = this.primaryHead;
         const budP = invLerp(head.budStart, head.budStart + head.budDuration, normTime);
         const bloomP = invLerp(head.bloomStart, head.bloomStart + head.bloomDuration, normTime);
-        const breathe = 1 + Math.sin(elapsedSec * 1.1 + this.windPhase) * 0.016;
+        const breathe =
+          1 +
+          Math.sin(elapsedSec * 1.1 + this.windPhase) * 0.016 +
+          beatPulse * 0.03;
         const headRot = windOffset * 0.0095;
 
         head.draw(
@@ -1178,7 +1274,9 @@
           headRot,
           breathe,
           dpr,
-          glowSprites
+          glowSprites,
+          beatEnergy,
+          beatPulse
         );
 
         if (!head.sparkleEmitted && bloomP > 0.38) {
@@ -1197,10 +1295,11 @@
      Blooming Choreography, Cinematic Camera Zoom-Out, and Interactive Magic.
      ------------------------------------------------------------------------ */
   class PeonyGardenScene {
-    constructor(canvas, callbacks) {
+    constructor(canvas, callbacks, audioController = null) {
       this.canvas = canvas;
       this.ctx = canvas.getContext("2d", { alpha: false });
       this.callbacks = callbacks;
+      this.audioController = audioController;
 
       this.width = window.innerWidth;
       this.height = window.innerHeight;
@@ -1216,6 +1315,9 @@
       this.totalElapsed = 0;
       this.lastFrameTime = 0;
       this.messageTriggered = false;
+      this.beatSparkleCooldown = 0;
+      this.beatEnergy = 0;
+      this.beatPulse = 0;
 
       // Scene entities
       this.stars = [];
@@ -1509,29 +1611,23 @@
           lerp(0.56, 1.18, depth) *
           (isHero ? 1.14 : 0.84 + rng() * 0.34);
 
-        // Choreographed normalized timeline (0.0 -> 1.0 over CONFIG.durationSec)
-        // Stage 1 (0.00-0.08): Background awakens
-        // Stage 2 (0.06-0.20): Light particles gather into soil
-        // Stage 3 (0.13-0.38): Stems grow from earth
-        // Stage 4 (0.22-0.48): Leaves & branches unfurl
-        // Stage 5 (0.33-0.55): Plump buds form
-        // Stage 6 (0.43-0.88): Peonies bloom one by one (hero cluster opens first!)
-        // Stage 7 & 8 (0.82-1.00): Full radiant garden + cinematic camera zoom-out
+        // Brisk, musical beat-synced timeline (0.0 -> 1.0 over CONFIG.durationSec)
+        // Stems surge early (~1.5s), buds form smoothly, peonies burst in musical waves!
         const centerDist = Math.abs(xNorm - 0.5) * 2; // 0 at center, 1 at edges
         const waveDelay = isHero
-          ? i * 0.022
-          : 0.05 + centerDist * 0.14 + rng() * 0.14;
+          ? i * 0.018
+          : 0.04 + centerDist * 0.13 + rng() * 0.13;
 
-        const stemStart = clamp(0.13 + waveDelay * 0.45, 0.12, 0.3);
-        const stemDuration = 0.14 + rng() * 0.07;
+        const stemStart = clamp(0.06 + waveDelay * 0.45, 0.05, 0.22);
+        const stemDuration = 0.14 + rng() * 0.06;
 
-        const budStart = clamp(stemStart + stemDuration * 0.78, 0.25, 0.46);
+        const budStart = clamp(stemStart + stemDuration * 0.72, 0.16, 0.36);
         const budDuration = 0.08 + rng() * 0.04;
 
         const bloomStart = isHero
-          ? clamp(0.4 + i * 0.042, 0.39, 0.62)
-          : clamp(0.46 + centerDist * 0.15 + rng() * 0.19, 0.45, 0.74);
-        const bloomDuration = clamp(0.15 + rng() * 0.08, 0.13, 0.91 - bloomStart);
+          ? clamp(0.28 + i * 0.036, 0.27, 0.52)
+          : clamp(0.34 + centerDist * 0.15 + rng() * 0.19, 0.33, 0.67);
+        const bloomDuration = clamp(0.15 + rng() * 0.08, 0.13, 0.89 - bloomStart);
 
         // Compound leaves along each stem (2 to 4 alternating leaf clusters)
         const leafCount = depth > 0.5 ? 3 + (rng() > 0.5 ? 1 : 0) : 2 + (rng() > 0.45 ? 1 : 0);
@@ -1544,7 +1640,7 @@
             side,
             size: radius * (0.58 + rng() * 0.32),
             angleJitter: (rng() - 0.5) * 0.24,
-            leafStart: clamp(stemStart + stemDuration * t * 0.95, 0.18, 0.46),
+            leafStart: clamp(stemStart + stemDuration * t * 0.9, 0.1, 0.38),
             leafDuration: 0.09 + rng() * 0.05,
           });
         }
@@ -1637,8 +1733,8 @@
         for (let k = 0; k < this.quality.gatheringPerPlant; k++) {
           const startX = plant.rootX + (rng() - 0.5) * this.width * 0.34;
           const startY = this.height * (0.08 + rng() * 0.54);
-          const arriveTime = clamp(plant.stemStart + (rng() - 0.5) * 0.04, 0.09, 0.28);
-          const departTime = clamp(arriveTime - (0.07 + rng() * 0.07), 0.03, 0.2);
+          const arriveTime = clamp(plant.stemStart + (rng() - 0.5) * 0.03, 0.05, 0.23);
+          const departTime = clamp(arriveTime - (0.05 + rng() * 0.05), 0.0, 0.16);
 
           this.gatheringLights.push({
             startX,
@@ -2064,14 +2160,41 @@
       this.lastFrameTime = now;
       this.totalElapsed += dt;
 
-      if (this.mode === "blooming") {
-        this.bloomElapsed += dt;
-      }
-
       const normTime =
         this.mode === "landing"
           ? 0
           : clamp(this.bloomElapsed / CONFIG.durationSec, 0, 1);
+
+      // Pull live musical beat metrics to drive growth surges & moonlight shimmer
+      if (this.audioController) {
+        const metrics = this.audioController.getBeatMetrics(dt, this.totalElapsed);
+        this.beatEnergy = metrics.energy;
+        this.beatPulse = metrics.beatPulse;
+      }
+
+      if (this.mode === "blooming") {
+        // Centered around 1.0x so total real-time stays ~45-48s while surging gently on harp beats
+        const beatPace = clamp(
+          0.86 + (this.beatEnergy - 0.3) * 0.38 + this.beatPulse * 0.42,
+          0.74,
+          1.4
+        );
+        this.bloomElapsed += dt * beatPace;
+      }
+
+      // Emit soft rising golden sparkles from a blooming peony when a strong beat hits
+      this.beatSparkleCooldown = Math.max(0, this.beatSparkleCooldown - dt);
+      if (
+        this.mode !== "landing" &&
+        this.beatPulse > 0.34 &&
+        this.beatSparkleCooldown <= 0 &&
+        this.plants.length > 0 &&
+        normTime > 0.32
+      ) {
+        this.beatSparkleCooldown = 0.42;
+        const pick = this.plants[Math.floor(Math.random() * this.plants.length)];
+        this.spawnSparkleBurst(pick.tipX, pick.tipY, pick.primaryHead.palette.glow, 4);
+      }
 
       // Trigger romantic message sequence right after grand zoom-out finishes!
       if (this.mode === "blooming" && normTime >= 1 && !this.messageTriggered) {
@@ -2101,8 +2224,8 @@
       }
 
       // Stage 1 gentle fade-in veil as landing screen dissolves
-      if (this.mode !== "landing" && normTime < 0.08) {
-        const veilAlpha = lerp(0.45, 0, easeOutCubic(normTime / 0.08));
+      if (this.mode !== "landing" && normTime < 0.06) {
+        const veilAlpha = lerp(0.42, 0, easeOutCubic(normTime / 0.06));
         ctx.fillStyle = `rgba(6, 9, 24, ${veilAlpha})`;
         ctx.fillRect(-100, -100, W + 200, H + 200);
       }
@@ -2112,7 +2235,13 @@
       this.drawShootingStars(ctx, dt);
 
       // 3. Distant background fireflies (behind garden)
-      this.updateAndDrawFireflies(ctx, dt, 0, 0.52, this.mode === "landing" ? 0.65 : 0.9);
+      this.updateAndDrawFireflies(
+        ctx,
+        dt,
+        0,
+        0.52,
+        (this.mode === "landing" ? 0.65 : 0.9) * (1 + this.beatPulse * 0.25)
+      );
 
       // 4. Stage 2: Gathering magical light particles streaming down to awaken the stems
       this.drawGatheringLights(ctx, normTime);
@@ -2121,7 +2250,16 @@
       if (this.mode !== "landing") {
         const sparkleCb = (x, y, col, n) => this.spawnSparkleBurst(x, y, col, n);
         for (let i = 0; i < this.plants.length; i++) {
-          this.plants[i].draw(ctx, normTime, this.totalElapsed, this.dpr, this.glowSprites, sparkleCb);
+          this.plants[i].draw(
+            ctx,
+            normTime,
+            this.totalElapsed,
+            this.dpr,
+            this.glowSprites,
+            sparkleCb,
+            this.beatEnergy,
+            this.beatPulse
+          );
         }
       }
 
@@ -2130,7 +2268,13 @@
       this.updateAndDrawSparkles(ctx, dt);
 
       // 7. Foreground luminous fireflies & bokeh light motes
-      this.updateAndDrawFireflies(ctx, dt, 0.52, 1.01, this.mode === "landing" ? 0.85 : 1.0);
+      this.updateAndDrawFireflies(
+        ctx,
+        dt,
+        0.52,
+        1.01,
+        (this.mode === "landing" ? 0.85 : 1.0) * (1 + this.beatPulse * 0.28)
+      );
 
       // 8. Soft luminous mist hugging the lower edge of the garden
       const groundMist = ctx.createLinearGradient(0, H * 0.88, 0, H + 20);
@@ -2140,6 +2284,61 @@
       ctx.fillRect(-60, H * 0.88, W + 120, H * 0.16);
 
       ctx.restore();
+    }
+
+    // Export a crisp, 100% UI-free lockscreen wallpaper snapshot directly from the live canvas
+    createLockscreenSnapshot(includeQuote = false) {
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = this.canvas.width;
+      exportCanvas.height = this.canvas.height;
+      const ectx = exportCanvas.getContext("2d");
+
+      // 1. Copy the live high-DPI procedural peony garden frame
+      ectx.drawImage(this.canvas, 0, 0);
+
+      // 2. Bake the soft dreamy edge vignette onto the exported image
+      const ew = exportCanvas.width;
+      const eh = exportCanvas.height;
+      const vig = ectx.createRadialGradient(
+        ew * 0.5,
+        eh * 0.45,
+        Math.min(ew, eh) * 0.25,
+        ew * 0.5,
+        eh * 0.5,
+        Math.max(ew, eh) * 0.72
+      );
+      vig.addColorStop(0, "rgba(6, 9, 24, 0)");
+      vig.addColorStop(1, "rgba(6, 9, 24, 0.42)");
+      ectx.fillStyle = vig;
+      ectx.fillRect(0, 0, ew, eh);
+
+      // 3. Optionally render the romantic quote neatly below the phone lockscreen clock zone
+      if (includeQuote) {
+        const isPortrait = eh > ew;
+        const textY = eh * (isPortrait ? 0.34 : 0.24);
+        const fontSize = Math.round(clamp(ew * (isPortrait ? 0.068 : 0.036), 22, 66));
+
+        ectx.save();
+        ectx.textAlign = "center";
+        ectx.textBaseline = "middle";
+        ectx.font = `500 ${fontSize}px "Dancing Script", "Cormorant Garamond", cursive, serif`;
+        ectx.shadowColor = "rgba(246, 178, 201, 0.65)";
+        ectx.shadowBlur = fontSize * 0.45;
+        ectx.fillStyle = "#ffe6ef";
+
+        // Wrap nicely on narrow portrait screens so margins stay elegant
+        const lineA = "Every flower in this garden";
+        const lineB = "is for you, bebe.";
+        if (isPortrait) {
+          ectx.fillText(lineA, ew * 0.5, textY - fontSize * 0.65);
+          ectx.fillText(lineB, ew * 0.5, textY + fontSize * 0.65);
+        } else {
+          ectx.fillText(`${lineA} ${lineB}`, ew * 0.5, textY);
+        }
+        ectx.restore();
+      }
+
+      return exportCanvas;
     }
 
     startLoop() {
@@ -2165,6 +2364,10 @@
     const musicLabel = document.getElementById("music-label");
     const bgMusic = document.getElementById("bg-music");
     const replayBtn = document.getElementById("replay-btn");
+    const photoBtn = document.getElementById("photo-btn");
+
+    const shutterFlash = document.getElementById("shutter-flash");
+    const cleanModeToast = document.getElementById("clean-mode-toast");
 
     const messageOverlay = document.getElementById("message-overlay");
     const msgLine1 = document.getElementById("msg-line-1");
@@ -2182,9 +2385,20 @@
     const closeLetterX = document.getElementById("close-letter-x");
     const returnGardenBtn = document.getElementById("return-garden-btn");
 
+    const photoModal = document.getElementById("photo-modal");
+    const photoBackdrop = document.getElementById("photo-backdrop");
+    const closePhotoX = document.getElementById("close-photo-x");
+    const photoPreviewImg = document.getElementById("photo-preview-img");
+    const photoQuoteToggle = document.getElementById("photo-quote-toggle");
+    const downloadPhotoBtn = document.getElementById("download-photo-btn");
+    const downloadPhotoLabel = document.getElementById("download-photo-label");
+    const cleanScreenshotBtn = document.getElementById("clean-screenshot-btn");
+
     const audio = new AudioController(bgMusic, musicToggleBtn, musicLabel);
     let messageTimers = [];
     let envelopeTimers = [];
+    let cleanToastTimer = null;
+    let latestSnapshotCanvas = null;
 
     function clearMessageTimers() {
       messageTimers.forEach((id) => clearTimeout(id));
@@ -2207,21 +2421,22 @@
       reopenBar.classList.add("is-hidden");
     }
 
-    // Sequentially reveal the 3 romantic lines + "Open Your Letter" button
+    // Sequentially reveal the 3 romantic lines + "Open Your Letter" & "Save for Lockscreen" buttons
     function revealRomanticMessages() {
       resetMessages();
       messageOverlay.classList.remove("is-hidden");
       replayBtn.classList.remove("is-hidden");
 
-      messageTimers.push(setTimeout(() => msgLine1.classList.add("is-visible"), 450));
-      messageTimers.push(setTimeout(() => msgLine2.classList.add("is-visible"), 3400));
-      messageTimers.push(setTimeout(() => msgLine3.classList.add("is-visible"), 6900));
-      messageTimers.push(setTimeout(() => letterCtaWrap.classList.add("is-visible"), 9600));
+      messageTimers.push(setTimeout(() => msgLine1.classList.add("is-visible"), 350));
+      messageTimers.push(setTimeout(() => msgLine2.classList.add("is-visible"), 2200));
+      messageTimers.push(setTimeout(() => msgLine3.classList.add("is-visible"), 4300));
+      messageTimers.push(setTimeout(() => letterCtaWrap.classList.add("is-visible"), 6100));
     }
 
     // Choreographed 3D Envelope -> Unfolded Love Letter transition
     function openLoveLetter() {
       clearEnvelopeTimers();
+      closePhotoModal();
 
       messageOverlay.classList.add("is-dimmed");
       reopenBar.classList.add("is-hidden");
@@ -2238,7 +2453,7 @@
       envelopeTimers.push(
         setTimeout(() => {
           envelope.classList.add("is-opening");
-        }, 550)
+        }, 500)
       );
 
       // Step 3: Unfold full readable parchment letter while garden remains softly visible behind
@@ -2246,7 +2461,7 @@
         setTimeout(() => {
           letterModal.classList.remove("stage-envelope");
           letterModal.classList.add("stage-letter");
-        }, 1950)
+        }, 1800)
       );
     }
 
@@ -2256,23 +2471,126 @@
       letterModal.classList.add("is-hidden");
       envelope.classList.remove("is-opening");
 
-      // Keep the glowing full garden open and provide a gentle pill to re-open the letter anytime
+      // Keep the glowing full garden open and provide gentle pills to re-open the letter or snap a photo
       reopenBar.classList.remove("is-hidden");
     }
 
-    const scene = new PeonyGardenScene(canvas, {
-      onGardenComplete: revealRomanticMessages,
-    });
+    // Lockscreen Photo Capture Studio
+    function refreshPhotoPreview() {
+      latestSnapshotCanvas = scene.createLockscreenSnapshot(photoQuoteToggle.checked);
+      photoPreviewImg.src = latestSnapshotCanvas.toDataURL("image/png");
+    }
+
+    function triggerShutterAndOpenPhoto() {
+      exitCleanMode();
+      if (shutterFlash) {
+        shutterFlash.classList.remove("is-flashing");
+        void shutterFlash.offsetWidth;
+        shutterFlash.classList.add("is-flashing");
+      }
+
+      refreshPhotoPreview();
+      downloadPhotoLabel.textContent = "Save Photo";
+      photoModal.classList.remove("is-hidden");
+    }
+
+    function closePhotoModal() {
+      photoModal.classList.add("is-hidden");
+    }
+
+    async function saveLockscreenPhoto() {
+      if (!latestSnapshotCanvas) refreshPhotoPreview();
+      const filename = "peony-for-bebe-lockscreen.png";
+
+      // Prefer native mobile Share Sheet when supported (lets iPhone/Android save straight to Gallery!)
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile && navigator.share && latestSnapshotCanvas.toBlob) {
+        try {
+          const blob = await new Promise((resolve) =>
+            latestSnapshotCanvas.toBlob(resolve, "image/png")
+          );
+          if (blob) {
+            const file = new File([blob], filename, { type: "image/png" });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: "Peony Garden for Bebe",
+              });
+              downloadPhotoLabel.textContent = "Saved ✦";
+              return;
+            }
+          }
+        } catch (err) {
+          // If user dismissed share sheet, stop quietly; otherwise fall through to direct download
+          if (err && err.name === "AbortError") return;
+        }
+      }
+
+      // Standard crisp PNG download
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = latestSnapshotCanvas.toDataURL("image/png");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      downloadPhotoLabel.textContent = "Downloaded ✦";
+      setTimeout(() => {
+        downloadPhotoLabel.textContent = "Save Photo";
+      }, 2200);
+    }
+
+    function enterCleanMode() {
+      closePhotoModal();
+      document.body.classList.add("is-clean-mode");
+      cleanModeToast.classList.remove("is-hidden");
+
+      clearTimeout(cleanToastTimer);
+      cleanToastTimer = setTimeout(() => {
+        cleanModeToast.classList.add("is-hidden");
+      }, 2300);
+    }
+
+    function exitCleanMode() {
+      if (!document.body.classList.contains("is-clean-mode")) return;
+      document.body.classList.remove("is-clean-mode");
+      clearTimeout(cleanToastTimer);
+      cleanModeToast.classList.add("is-hidden");
+    }
+
+    const scene = new PeonyGardenScene(
+      canvas,
+      {
+        onGardenComplete: revealRomanticMessages,
+      },
+      audio
+    );
 
     // Landing CTA: Enter the Garden + start local background music softly
     enterGardenBtn.addEventListener("click", () => {
       landingScreen.classList.add("is-leaving");
+      photoBtn.classList.remove("is-hidden");
       audio.play();
       scene.startBlooming();
     });
 
     openLetterBtn.addEventListener("click", openLoveLetter);
     reopenLetterBtn.addEventListener("click", openLoveLetter);
+
+    photoBtn.addEventListener("click", triggerShutterAndOpenPhoto);
+
+    photoQuoteToggle.addEventListener("change", refreshPhotoPreview);
+    downloadPhotoBtn.addEventListener("click", saveLockscreenPhoto);
+    cleanScreenshotBtn.addEventListener("click", enterCleanMode);
+    closePhotoX.addEventListener("click", closePhotoModal);
+    photoBackdrop.addEventListener("click", closePhotoModal);
+
+    // Tap anywhere on the canvas during Clean Screenshot Mode to bring UI controls back
+    canvas.addEventListener("click", () => {
+      if (document.body.classList.contains("is-clean-mode")) {
+        exitCleanMode();
+      }
+    });
 
     closeLetterX.addEventListener("click", closeLoveLetter);
     returnGardenBtn.addEventListener("click", closeLoveLetter);
@@ -2283,6 +2601,8 @@
     });
 
     replayBtn.addEventListener("click", () => {
+      exitCleanMode();
+      closePhotoModal();
       closeLoveLetter();
       resetMessages();
       replayBtn.classList.add("is-hidden");
@@ -2290,8 +2610,14 @@
     });
 
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !letterModal.classList.contains("is-hidden")) {
-        closeLoveLetter();
+      if (e.key === "Escape") {
+        if (document.body.classList.contains("is-clean-mode")) {
+          exitCleanMode();
+        } else if (!photoModal.classList.contains("is-hidden")) {
+          closePhotoModal();
+        } else if (!letterModal.classList.contains("is-hidden")) {
+          closeLoveLetter();
+        }
       }
     });
   }

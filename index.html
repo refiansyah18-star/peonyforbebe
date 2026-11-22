@@ -34,6 +34,15 @@
 
   <!-- Minimalist Floating Controls -->
   <header class="garden-hud" id="garden-hud" aria-label="Garden controls">
+    <button type="button" id="photo-btn" class="hud-pill hud-icon-only photo-pill is-hidden" aria-label="Save lockscreen photo"
+      title="Save Lockscreen Photo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+        stroke-linejoin="round" aria-hidden="true">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+        <circle cx="12" cy="13" r="4" />
+      </svg>
+    </button>
+
     <button type="button" id="replay-btn" class="hud-pill hud-icon-only is-hidden" aria-label="Bloom again"
       title="Bloom again">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
@@ -54,6 +63,14 @@
       <span class="music-label" id="music-label">Music Off</span>
     </button>
   </header>
+
+  <!-- Soft Moonlight Camera Shutter Flash -->
+  <div id="shutter-flash" class="shutter-flash" aria-hidden="true"></div>
+
+  <!-- Clean Screenshot Mode Hint Toast -->
+  <div id="clean-mode-toast" class="clean-mode-toast is-hidden" aria-live="polite">
+    Clean view — screenshot now, tap anywhere to return
+  </div>
 
   <!-- 1. Landing Page Overlay -->
   <main id="landing-screen" class="landing-screen" aria-labelledby="landing-title">
@@ -115,12 +132,53 @@
     </div>
   </section>
 
-  <!-- Floating Re-open Letter Pill (appears when user returns to admire the garden) -->
+  <!-- Floating Re-open Letter Pill (appears when admiring full garden) -->
   <div class="reopen-bar is-hidden" id="reopen-bar">
     <button type="button" id="reopen-letter-btn" class="ethereal-btn reopen-btn">
       <span class="btn-glow" aria-hidden="true"></span>
       <span class="btn-text">Open Your Letter</span>
     </button>
+  </div>
+
+  <!-- 4. Lockscreen Photo Preview & Save Modal -->
+  <div id="photo-modal" class="photo-modal is-hidden" role="dialog" aria-modal="true"
+    aria-labelledby="photo-modal-title">
+    <div class="photo-backdrop" id="photo-backdrop"></div>
+
+    <div class="photo-sheet">
+      <button type="button" id="close-photo-x" class="photo-close-x" aria-label="Close photo preview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+
+      <h2 id="photo-modal-title" class="photo-title">Your Lockscreen Garden</h2>
+      <p class="photo-subtitle">Clean snapshot without buttons — ready for your wallpaper</p>
+
+      <div class="photo-frame">
+        <img id="photo-preview-img" alt="Moonlit peony garden wallpaper preview" />
+      </div>
+
+      <label class="quote-toggle">
+        <input type="checkbox" id="photo-quote-toggle" />
+        <span class="toggle-track" aria-hidden="true"></span>
+        <span>Include romantic quote on wallpaper</span>
+      </label>
+
+      <div class="photo-actions">
+        <button type="button" id="download-photo-btn" class="ethereal-btn photo-save-btn">
+          <span class="btn-glow" aria-hidden="true"></span>
+          <span class="btn-text" id="download-photo-label">Save Photo</span>
+        </button>
+
+        <button type="button" id="clean-screenshot-btn" class="secondary-glass-btn">
+          <span>Hide UI for Screenshot</span>
+        </button>
+      </div>
+
+      <p class="photo-tip">Tip: On iPhone / WhatsApp browser, you can also long-press the image above &rarr; Save to Photos</p>
+    </div>
   </div>
 
   <!-- 3. Animated Envelope & Love Letter Experience -->
