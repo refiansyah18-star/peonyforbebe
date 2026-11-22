@@ -1,0 +1,7 @@
+# Ignore raw source audio duplicate (site uses assets/music/great-fairy-fountain.m4a)
+*.mpeg
+
+# OS & editor artifacts
+.DS_Store
+Thumbs.db
+*.log

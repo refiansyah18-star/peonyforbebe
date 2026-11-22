@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#080b1d" />
+  <meta name="description" content="Peony for Abel — an interactive moonlit peony garden made with love." />
+  <title>Peony for Abel</title>
+
+  <link rel="icon" type="image/svg+xml" href="assets/images/peony-favicon.svg" />
+
+  <!-- Optional typography enhancement (gracefully falls back offline to local serif & script stacks) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Dancing+Script:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- Fullscreen Procedural Peony Garden Canvas -->
+  <canvas id="garden-canvas" aria-label="Animated moonlit peony flower garden"></canvas>
+
+  <!-- Subtle atmospheric vignette framing the canvas -->
+  <div class="ambient-vignette" aria-hidden="true"></div>
+
+  <!-- Local Background Music (plays only after user interaction) -->
+  <audio id="bg-music" loop preload="metadata">
+    <source src="assets/music/great-fairy-fountain.m4a" type="audio/mp4" />
+  </audio>
+
+  <!-- Minimalist Floating Controls -->
+  <header class="garden-hud" id="garden-hud" aria-label="Garden controls">
+    <button type="button" id="replay-btn" class="hud-pill hud-icon-only is-hidden" aria-label="Bloom again"
+      title="Bloom again">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+        stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+        <path d="M3 3v5h5" />
+      </svg>
+    </button>
+
+    <button type="button" id="music-toggle-btn" class="hud-pill music-pill" aria-label="Play music" aria-pressed="false"
+      title="Play / Pause Music">
+      <span class="sound-bars" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+      </span>
+      <span class="music-label" id="music-label">Music Off</span>
+    </button>
+  </header>
+
+  <!-- 1. Landing Page Overlay -->
+  <main id="landing-screen" class="landing-screen" aria-labelledby="landing-title">
+    <div class="landing-inner">
+      <div class="landing-crest" aria-hidden="true">
+        <svg viewBox="0 0 120 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 22H42" stroke="url(#goldLineL)" stroke-width="0.9" stroke-linecap="round" />
+          <path d="M78 22H112" stroke="url(#goldLineR)" stroke-width="0.9" stroke-linecap="round" />
+          <path
+            d="M60 7C62.2 14.5 67.5 19.8 75 22C67.5 24.2 62.2 29.5 60 37C57.8 29.5 52.5 24.2 45 22C52.5 19.8 57.8 14.5 60 7Z"
+            fill="url(#starGold)" />
+          <circle cx="48" cy="14" r="1.4" fill="#f7c8d8" opacity="0.85" />
+          <circle cx="72" cy="30" r="1.2" fill="#e2d1f9" opacity="0.85" />
+          <defs>
+            <linearGradient id="goldLineL" x1="8" y1="22" x2="42" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#f4d08c" stop-opacity="0" />
+              <stop offset="1" stop-color="#f4d08c" stop-opacity="0.75" />
+            </linearGradient>
+            <linearGradient id="goldLineR" x1="78" y1="22" x2="112" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#f4d08c" stop-opacity="0.75" />
+              <stop offset="1" stop-color="#f4d08c" stop-opacity="0" />
+            </linearGradient>
+            <radialGradient id="starGold" cx="50%" cy="50%" r="50%">
+              <stop stop-color="#fff7ec" />
+              <stop offset="55%" stop-color="#f4d08c" />
+              <stop offset="100%" stop-color="#d89d58" stop-opacity="0.3" />
+            </radialGradient>
+          </defs>
+        </svg>
+      </div>
+
+      <p class="landing-eyebrow">For Bebe</p>
+      <h1 id="landing-title" class="landing-title">A Flower Made Just for You</h1>
+      <p class="landing-subtitle">Something special, made with love.</p>
+
+      <button type="button" id="enter-garden-btn" class="ethereal-btn enter-btn">
+        <span class="btn-glow" aria-hidden="true"></span>
+        <span class="btn-text">Enter the Garden</span>
+      </button>
+
+      <p class="landing-hint">Turn on your sound for the full experience</p>
+    </div>
+  </main>
+
+  <!-- 2. Romantic Post-Bloom Message Overlay -->
+  <section id="message-overlay" class="message-overlay is-hidden" aria-live="polite"
+    aria-label="Romantic message for Abel">
+    <div class="message-stack">
+      <p class="romantic-line line-1" id="msg-line-1">She wanted flowers...</p>
+      <p class="romantic-line line-2" id="msg-line-2">So I made her a whole garden.</p>
+      <p class="romantic-line line-3" id="msg-line-3">Every flower in this garden is for you, bebe.</p>
+
+      <div class="letter-cta-wrap" id="letter-cta-wrap">
+        <button type="button" id="open-letter-btn" class="ethereal-btn open-letter-btn">
+          <span class="btn-glow" aria-hidden="true"></span>
+          <span class="btn-text">Open Your Letter</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Floating Re-open Letter Pill (appears when user returns to admire the garden) -->
+  <div class="reopen-bar is-hidden" id="reopen-bar">
+    <button type="button" id="reopen-letter-btn" class="ethereal-btn reopen-btn">
+      <span class="btn-glow" aria-hidden="true"></span>
+      <span class="btn-text">Open Your Letter</span>
+    </button>
+  </div>
+
+  <!-- 3. Animated Envelope & Love Letter Experience -->
+  <div id="letter-modal" class="letter-modal is-hidden" role="dialog" aria-modal="true"
+    aria-labelledby="letter-salutation">
+    <div class="letter-backdrop" id="letter-backdrop"></div>
+
+    <!-- Envelope Opening Stage -->
+    <div class="envelope-stage" id="envelope-stage" aria-hidden="true">
+      <div class="envelope-aura"></div>
+      <div class="envelope" id="envelope">
+        <div class="envelope-back"></div>
+        <div class="envelope-letter-slip">
+          <span class="slip-lines"></span>
+          <span class="slip-lines short"></span>
+        </div>
+        <div class="envelope-pocket"></div>
+        <div class="envelope-flap"></div>
+        <div class="wax-seal">
+          <span class="wax-monogram">A</span>
+        </div>
+      </div>
+      <p class="envelope-caption">Unfolding your letter…</p>
+    </div>
+
+    <!-- Unfolded Parchment Love Letter -->
+    <article class="letter-card" id="letter-card">
+      <div class="letter-radiance" aria-hidden="true"></div>
+
+      <!-- Delicate Botanical Corner Flourishes -->
+      <span class="corner-flourish top-left" aria-hidden="true"></span>
+      <span class="corner-flourish top-right" aria-hidden="true"></span>
+      <span class="corner-flourish bottom-left" aria-hidden="true"></span>
+      <span class="corner-flourish bottom-right" aria-hidden="true"></span>
+
+      <button type="button" id="close-letter-x" class="letter-close-x" aria-label="Close letter"
+        title="Return to the garden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+
+      <div class="letter-scroll">
+        <div class="letter-header">
+          <span class="letter-date-ornament">✦ &nbsp; Peonies Under Moonlight &nbsp; ✦</span>
+          <h2 id="letter-salutation" class="letter-salutation">My Dearest Bebe,</h2>
+        </div>
+
+        <!--
+          CUSTOMIZE YOUR PERSONAL LOVE LETTER HERE:
+          Edit any paragraph below to include your own memories, pet names, or signature.
+        -->
+        <div class="letter-body">
+          <p>
+            If I could gather every soft and beautiful thing in this world and place it
+            gently into your hands, I still don’t think it would ever compare to the warmth
+            you bring into my life just by being you.
+          </p>
+          <p>
+            You asked for flowers, and real bouquets are lovely—but they fade far too
+            soon. So I wanted to build you something that would never wilt: a quiet,
+            moonlit garden of peonies that blooms just for you, whenever you want to visit
+            it, wherever you are.
+          </p>
+          <p>
+            Every petal opening here carries a little piece of how much I adore you—your
+            laugh, your gentle heart, the way ordinary days feel magical simply because I
+            get to share them with you, bebe.
+          </p>
+          <p>
+            Thank you for being my favorite person, my calmest place, and the brightest part
+            of every day. No matter how many seasons pass, my heart will always keep
+            blooming for you.
+          </p>
+        </div>
+
+        <footer class="letter-footer">
+          <p class="letter-signoff">Always and endlessly yours,</p>
+          <p class="letter-signature">With all my love ✦</p>
+
+          <button type="button" id="return-garden-btn" class="return-garden-btn">
+            Return to the Garden
+          </button>
+        </footer>
+      </div>
+    </article>
+  </div>
+
+  <noscript>
+    <div class="noscript-fallback">
+      <h1>Peony for Abel</h1>
+      <p>Please enable JavaScript to watch your moonlit peony garden bloom.</p>
+    </div>
+  </noscript>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
