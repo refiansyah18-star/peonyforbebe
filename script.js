@@ -14,11 +14,12 @@
   const queryDuration = parseFloat(urlParams.get("duration"));
 
   const CONFIG = {
-    // Dreamy beat-synced blooming duration in seconds (~48s real-time; override via ?duration=XX)
+    // First hero peony blooms right in the first 8s to the song beat; rest of garden follows (~42s total)
     durationSec:
-      Number.isFinite(queryDuration) && queryDuration >= 8 && queryDuration <= 240
+      Number.isFinite(queryDuration) && queryDuration >= 12 && queryDuration <= 240
         ? queryDuration
-        : 48,
+        : 42,
+    firstBloomSec: 8.0,
 
     // Target music volume (0.0 to 1.0)
     musicVolume: 0.72,
@@ -311,6 +312,16 @@
         this.pause();
       } else {
         this.play();
+      }
+    }
+
+    restartFromBeginning() {
+      if (!this.isPlaying || this.usingFallback || !this.audioEl) return;
+      try {
+        this.audioEl.currentTime = 0;
+        this.audioEl.play().catch(() => {});
+      } catch {
+        // Ignore seek errors if metadata not ready
       }
     }
 
@@ -1400,7 +1411,7 @@
           ? 0
           : clamp(this.bloomElapsed / CONFIG.durationSec, 0, 1);
 
-      if (isInitial || this.mode === "landing" || normTime < 0.35) {
+      if (isInitial || this.mode === "landing" || normTime < 0.54) {
         this.buildGatheringLights();
       }
 
@@ -1549,10 +1560,15 @@
       const plants = [];
       const heroCount = Math.min(7, Math.round(count * 0.16));
       const nonHeroCount = Math.max(1, count - heroCount);
+      const D = CONFIG.durationSec;
+      const firstFinishSec = Math.min(CONFIG.firstBloomSec, D * 0.42);
+      const secToNorm = (sec) => clamp(sec / D, 0, 1);
 
       // Create 3 lush depth bands evenly across the ENTIRE width (far-left to far-right)
-      // plus a balanced hero cluster so both edges and center are overflowing with peonies.
+      // Plant i === 0 is the spotlight FIRST peony at center: rises and blooms right in the first 8s!
+      // All remaining plants awaken right after and fill the whole garden in rolling waves.
       for (let i = 0; i < count; i++) {
+        const isFirstBloom = i === 0;
         const isHero = i < heroCount;
 
         // Depth (0 = far background, 1 = close foreground)
@@ -1561,8 +1577,11 @@
         let depth;
         let xNorm;
 
-        if (isHero) {
-          depth = 0.76 + rng() * 0.22;
+        if (isFirstBloom) {
+          depth = 0.96;
+          xNorm = 0.5;
+        } else if (isHero) {
+          depth = 0.76 + rng() * 0.2;
           const heroSlots = [0.5, 0.36, 0.64, 0.22, 0.78, 0.09, 0.91];
           xNorm = clamp(heroSlots[i % heroSlots.length] + (rng() - 0.5) * 0.04, 0.03, 0.97);
         } else {
@@ -1571,7 +1590,7 @@
           xNorm = clamp(slot + (rng() - 0.5) * (0.85 / nonHeroCount), -0.02, 1.02);
 
           const depthSeq = (j * 0.6180339887498949 + 0.19) % 1;
-          depth = clamp(0.08 + depthSeq * 0.9 + (rng() - 0.5) * 0.08, 0.06, 0.99);
+          depth = clamp(0.08 + depthSeq * 0.88 + (rng() - 0.5) * 0.08, 0.06, 0.95);
         }
 
         const rootX = xNorm * W;
@@ -1579,28 +1598,32 @@
 
         // Height: lush rolling garden meadow contour with both tall back blooms & lower foreground blooms
         const edgeLift = Math.abs(xNorm - 0.5) * 0.07;
-        const heightFrac = isHero
-          ? lerp(0.36, 0.53, rng())
+        const heightFrac = isFirstBloom
+          ? isPortrait ? 0.43 : 0.47
+          : isHero
+          ? lerp(0.35, 0.52, rng())
           : lerp(0.18, 0.57, 0.25 + (1 - depth) * 0.4 + rng() * 0.36 + edgeLift);
 
         // Keep top sky open (~36-42% clear) so moon, stars, and romantic messages shine clearly!
         const clampedHeightFrac = clamp(heightFrac, 0.17, isPortrait ? 0.52 : 0.58);
         const stemHeight = H * clampedHeightFrac;
 
-        // Natural gentle lean (keep edge flowers hugging close to screen edges so no left/right gap forms)
+        // Natural gentle lean (keep the first spotlight peony poised gracefully near dead-center)
         const maxLean = W * (isPortrait ? 0.11 : 0.075);
-        const lean = (rng() - 0.5) * maxLean;
+        const lean = isFirstBloom ? (rng() - 0.5) * W * 0.018 : (rng() - 0.5) * maxLean;
         const tipX = clamp(rootX + lean, -W * 0.01, W * 1.01);
         const tipY = H - stemHeight;
 
         const curveDir = (rng() - 0.5) * 2;
-        const ctrl1X = lerp(rootX, tipX, 0.32) + curveDir * stemHeight * 0.12;
+        const ctrl1X = lerp(rootX, tipX, 0.32) + curveDir * stemHeight * (isFirstBloom ? 0.05 : 0.12);
         const ctrl1Y = lerp(rootY, tipY, 0.35);
-        const ctrl2X = lerp(rootX, tipX, 0.7) - curveDir * stemHeight * 0.08;
+        const ctrl2X = lerp(rootX, tipX, 0.7) - curveDir * stemHeight * (isFirstBloom ? 0.04 : 0.08);
         const ctrl2Y = lerp(rootY, tipY, 0.72);
 
-        // Pick peony palette with balanced romantic harmony
-        const palIndex = isHero
+        // Pick peony palette (first spotlight peony is signature Moonlit Blush!)
+        const palIndex = isFirstBloom
+          ? 0
+          : isHero
           ? i % CONFIG.peonyPalettes.length
           : Math.floor(rng() * CONFIG.peonyPalettes.length);
         const palette = CONFIG.peonyPalettes[palIndex];
@@ -1609,28 +1632,56 @@
         const radius =
           baseRadius *
           lerp(0.56, 1.18, depth) *
-          (isHero ? 1.14 : 0.84 + rng() * 0.34);
+          (isFirstBloom ? 1.24 : isHero ? 1.12 : 0.84 + rng() * 0.34);
 
-        // Brisk, musical beat-synced timeline (0.0 -> 1.0 over CONFIG.durationSec)
-        // Stems surge early (~1.5s), buds form smoothly, peonies burst in musical waves!
-        const centerDist = Math.abs(xNorm - 0.5) * 2; // 0 at center, 1 at edges
-        const waveDelay = isHero
-          ? i * 0.018
-          : 0.04 + centerDist * 0.13 + rng() * 0.13;
+        // Choreographed Timeline:
+        // 1) Plant 0 (Spotlight First Flower): grows & blooms cleanly inside the FIRST 8 SECONDS!
+        //    - 0.0s-1.4s: Golden light streams to center soil
+        //    - 0.6s-3.5s: First stem & leaves rise gracefully
+        //    - 2.8s-4.4s: Silky peony bud forms
+        //    - 3.8s-8.0s: Petals unfurl petal-by-petal to the beat -> radiant full bloom right at 8.0s!
+        // 2) Plants 1..N (The Whole Garden): awaken right after and sweep outward from center to edges!
+        let stemStart;
+        let stemDuration;
+        let budStart;
+        let budDuration;
+        let bloomStart;
+        let bloomDuration;
 
-        const stemStart = clamp(0.06 + waveDelay * 0.45, 0.05, 0.22);
-        const stemDuration = 0.14 + rng() * 0.06;
+        if (isFirstBloom) {
+          stemStart = secToNorm(firstFinishSec * 0.075); // ~0.6s
+          stemDuration = secToNorm(firstFinishSec * 0.36); // ~0.6s -> 3.5s
+          budStart = secToNorm(firstFinishSec * 0.34); // ~2.7s
+          budDuration = secToNorm(firstFinishSec * 0.2); // ~2.7s -> 4.3s
+          bloomStart = secToNorm(firstFinishSec * 0.475); // ~3.8s
+          bloomDuration = secToNorm(firstFinishSec * 0.525); // ~3.8s -> 8.0s EXACT!
+        } else {
+          const restStart = secToNorm(firstFinishSec * 0.94); // ~7.5s, wakes up as flower #1 peaks!
+          const centerDist = Math.abs(xNorm - 0.5) * 2; // 0 at center, 1 at far left/right
+          const wave = isHero
+            ? (i - 1) * 0.028
+            : 0.02 + centerDist * 0.16 + rng() * 0.15;
 
-        const budStart = clamp(stemStart + stemDuration * 0.72, 0.16, 0.36);
-        const budDuration = 0.08 + rng() * 0.04;
+          stemStart = clamp(restStart + wave * 0.65, restStart, 0.44);
+          stemDuration = 0.12 + rng() * 0.06;
 
-        const bloomStart = isHero
-          ? clamp(0.28 + i * 0.036, 0.27, 0.52)
-          : clamp(0.34 + centerDist * 0.15 + rng() * 0.19, 0.33, 0.67);
-        const bloomDuration = clamp(0.15 + rng() * 0.08, 0.13, 0.89 - bloomStart);
+          budStart = clamp(stemStart + stemDuration * 0.72, restStart + 0.08, 0.56);
+          budDuration = 0.07 + rng() * 0.035;
+
+          bloomStart = clamp(
+            restStart + 0.13 + centerDist * 0.15 + rng() * 0.22,
+            restStart + 0.11,
+            0.73
+          );
+          bloomDuration = clamp(0.14 + rng() * 0.07, 0.12, 0.91 - bloomStart);
+        }
 
         // Compound leaves along each stem (2 to 4 alternating leaf clusters)
-        const leafCount = depth > 0.5 ? 3 + (rng() > 0.5 ? 1 : 0) : 2 + (rng() > 0.45 ? 1 : 0);
+        const leafCount = isFirstBloom
+          ? 4
+          : depth > 0.5
+          ? 3 + (rng() > 0.5 ? 1 : 0)
+          : 2 + (rng() > 0.45 ? 1 : 0);
         const leaves = [];
         for (let l = 0; l < leafCount; l++) {
           const t = lerp(0.24, 0.76, (l + 0.35) / leafCount) + (rng() - 0.5) * 0.05;
@@ -1640,8 +1691,8 @@
             side,
             size: radius * (0.58 + rng() * 0.32),
             angleJitter: (rng() - 0.5) * 0.24,
-            leafStart: clamp(stemStart + stemDuration * t * 0.9, 0.1, 0.38),
-            leafDuration: 0.09 + rng() * 0.05,
+            leafStart: clamp(stemStart + stemDuration * t * 0.88, 0.02, 0.58),
+            leafDuration: isFirstBloom ? secToNorm(1.4) : 0.08 + rng() * 0.04,
           });
         }
 
@@ -1653,21 +1704,21 @@
           budDuration,
           bloomStart,
           bloomDuration,
-          facingTilt: 0.74 + rng() * 0.2,
-          tiltAngle: (rng() - 0.5) * 0.52,
+          facingTilt: isFirstBloom ? 0.88 : 0.74 + rng() * 0.2,
+          tiltAngle: isFirstBloom ? 0.04 : (rng() - 0.5) * 0.52,
           tierScale: this.quality.tierScale,
           seed: Math.floor(rng() * 1e9),
         });
 
         // Add graceful secondary branch with smaller peony or delicate bud on ~52% of plants
         let branch = null;
-        if (rng() < 0.54 && stemHeight > H * 0.26) {
+        if (!isFirstBloom && rng() < 0.54 && stemHeight > H * 0.26) {
           const side = rng() > 0.5 ? 1 : -1;
           const attachT = 0.44 + rng() * 0.2;
           const bLen = stemHeight * (0.24 + rng() * 0.14);
           const bRadius = radius * (0.54 + rng() * 0.22);
-          const bStart = clamp(stemStart + stemDuration * 0.65, 0.22, 0.42);
-          const bDur = 0.11 + rng() * 0.04;
+          const bStart = clamp(stemStart + stemDuration * 0.65, 0.24, 0.56);
+          const bDur = 0.1 + rng() * 0.04;
           const isStayingHalfBud = rng() < 0.22; // Keep a few tender half-open buds for botanical realism!
 
           branch = {
@@ -1679,13 +1730,13 @@
             head: new PeonyHead({
               radius: bRadius,
               palette,
-              depth: clamp(depth - 0.08, 0.05, 0.95),
-              budStart: clamp(bStart + bDur * 0.75, 0.32, 0.54),
-              budDuration: 0.08,
+              depth: clamp(depth - 0.08, 0.05, 0.94),
+              budStart: clamp(bStart + bDur * 0.75, 0.34, 0.66),
+              budDuration: 0.075,
               bloomStart: isStayingHalfBud
-                ? 0.78
-                : clamp(bloomStart + 0.06 + rng() * 0.08, 0.52, 0.78),
-              bloomDuration: isStayingHalfBud ? 0.45 : 0.14,
+                ? 0.8
+                : clamp(bloomStart + 0.05 + rng() * 0.07, 0.44, 0.78),
+              bloomDuration: isStayingHalfBud ? 0.42 : 0.13,
               facingTilt: 0.72 + rng() * 0.22,
               tiltAngle: side * (0.2 + rng() * 0.35),
               tierScale: this.quality.tierScale * 0.85,
@@ -1724,28 +1775,36 @@
       this.plants = plants;
     }
 
-    // Build luminous light-particle streams that gather into the soil during Stage 2
+    // Build luminous light-particle streams:
+    // Wave 1 (0s-1.5s) streams straight to center to awaken the FIRST spotlight flower!
+    // Wave 2 (~6.5s-18s) sweeps across the whole garden right as flower #1 finishes blooming.
     buildGatheringLights() {
       const rng = createRng(99371);
       this.gatheringLights = [];
 
       for (const plant of this.plants) {
-        for (let k = 0; k < this.quality.gatheringPerPlant; k++) {
-          const startX = plant.rootX + (rng() - 0.5) * this.width * 0.34;
+        const isFirst = plant.id === 0;
+        const count = isFirst ? 14 : this.quality.gatheringPerPlant;
+        for (let k = 0; k < count; k++) {
+          const startX = plant.rootX + (rng() - 0.5) * this.width * (isFirst ? 0.28 : 0.34);
           const startY = this.height * (0.08 + rng() * 0.54);
-          const arriveTime = clamp(plant.stemStart + (rng() - 0.5) * 0.03, 0.05, 0.23);
-          const departTime = clamp(arriveTime - (0.05 + rng() * 0.05), 0.0, 0.16);
+          const arriveTime = isFirst
+            ? clamp(plant.stemStart + rng() * 0.025, 0.015, 0.055)
+            : clamp(plant.stemStart + (rng() - 0.5) * 0.03, 0.16, 0.46);
+          const departTime = isFirst
+            ? clamp(rng() * 0.015, 0, arriveTime - 0.01)
+            : clamp(arriveTime - (0.05 + rng() * 0.05), 0.11, arriveTime - 0.02);
 
           this.gatheringLights.push({
             startX,
             startY,
-            targetX: plant.rootX + (rng() - 0.5) * 18,
+            targetX: plant.rootX + (rng() - 0.5) * (isFirst ? 10 : 18),
             targetY: this.height - 6 - rng() * 18,
-            swirlAmp: (rng() - 0.5) * 90,
+            swirlAmp: (rng() - 0.5) * (isFirst ? 75 : 90),
             departTime,
             arriveTime,
-            size: 5 + rng() * 9,
-            color: rng() < 0.48 ? "gold" : plant.sparkColor,
+            size: isFirst ? 7 + rng() * 10 : 5 + rng() * 9,
+            color: rng() < 0.52 ? "gold" : plant.sparkColor,
           });
         }
       }
@@ -1838,7 +1897,7 @@
         lerp(startZoom, startZoom - 0.06, subtleDrift) * (1 - grandZoomOut) +
         1.0 * grandZoomOut;
 
-      const focusY = lerp(0.64, 0.5, grandZoomOut);
+      const focusY = lerp(0.59, 0.5, grandZoomOut);
       const focusX = 0.5 + Math.sin(this.totalElapsed * 0.14) * 0.012 * (1 - grandZoomOut);
 
       return { zoom, focusX, focusY };
@@ -1971,7 +2030,7 @@
 
     // Stage 2: Magical light particles streaming & gathering into the dark soil to awaken seeds
     drawGatheringLights(ctx, normTime) {
-      if (this.mode === "landing" || normTime > 0.34) return;
+      if (this.mode === "landing" || normTime > 0.52) return;
 
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
@@ -1999,7 +2058,7 @@
       }
 
       // Soft luminous ground-seed glow along earth while stems awaken
-      const soilPulse = Math.sin(invLerp(0.06, 0.34, normTime) * Math.PI);
+      const soilPulse = Math.sin(invLerp(0.01, 0.5, normTime) * Math.PI);
       if (soilPulse > 0.01) {
         const soilGrad = ctx.createLinearGradient(0, this.height - 90, 0, this.height);
         soilGrad.addColorStop(0, "rgba(244, 208, 140, 0)");
@@ -2173,27 +2232,40 @@
       }
 
       if (this.mode === "blooming") {
-        // Centered around 1.0x so total real-time stays ~45-48s while surging gently on harp beats
-        const beatPace = clamp(
-          0.86 + (this.beatEnergy - 0.3) * 0.38 + this.beatPulse * 0.42,
-          0.74,
-          1.4
-        );
-        this.bloomElapsed += dt * beatPace;
+        // Lock the first 8 seconds strictly 1:1 with real song time so Flower #1 hits full bloom
+        // RIGHT at 8.0s on the beat; after 8.5s let the rest of the garden breathe gently with the melody.
+        if (this.bloomElapsed < CONFIG.firstBloomSec + 0.5) {
+          this.bloomElapsed += dt;
+        } else {
+          const beatPace = clamp(
+            0.94 + (this.beatEnergy - 0.3) * 0.3 + this.beatPulse * 0.36,
+            0.84,
+            1.34
+          );
+          this.bloomElapsed += dt * beatPace;
+        }
       }
 
-      // Emit soft rising golden sparkles from a blooming peony when a strong beat hits
+      // Emit soft rising golden sparkles when a strong beat hits (starting right as Flower #1 opens!)
       this.beatSparkleCooldown = Math.max(0, this.beatSparkleCooldown - dt);
       if (
         this.mode !== "landing" &&
-        this.beatPulse > 0.34 &&
+        this.beatPulse > 0.3 &&
         this.beatSparkleCooldown <= 0 &&
         this.plants.length > 0 &&
-        normTime > 0.32
+        this.bloomElapsed > 3.5
       ) {
-        this.beatSparkleCooldown = 0.42;
-        const pick = this.plants[Math.floor(Math.random() * this.plants.length)];
-        this.spawnSparkleBurst(pick.tipX, pick.tipY, pick.primaryHead.palette.glow, 4);
+        this.beatSparkleCooldown = 0.45;
+        if (this.bloomElapsed <= CONFIG.firstBloomSec + 0.8) {
+          // Focus beat sparkles right on the spotlight first peony during the first 8 seconds!
+          const firstPlant = this.plants.find((pl) => pl.id === 0);
+          if (firstPlant) {
+            this.spawnSparkleBurst(firstPlant.tipX, firstPlant.tipY, "gold", 6);
+          }
+        } else {
+          const pick = this.plants[Math.floor(Math.random() * this.plants.length)];
+          this.spawnSparkleBurst(pick.tipX, pick.tipY, pick.primaryHead.palette.glow, 4);
+        }
       }
 
       // Trigger romantic message sequence right after grand zoom-out finishes!
@@ -2606,6 +2678,7 @@
       closeLoveLetter();
       resetMessages();
       replayBtn.classList.add("is-hidden");
+      audio.restartFromBeginning();
       scene.startBlooming();
     });
 
